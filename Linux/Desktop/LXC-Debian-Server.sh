@@ -1,4 +1,17 @@
 #!/bin/bash
+# Check -----------------------------------------------------------
+file="/etc/lxc-ssh-flag"
+if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
+    echo "检查通过，开始安装服务环境....." ;;
+else
+    read -r content < "$file"      # 去掉前后空白，只读第一行
+    case "$content" in
+        0) echo "已经安装过环境，禁止重复安装" && exit ;;
+        9) echo "已经安装过X11，禁止重复安装" && exit ;;
+        *) echo "已经安装过桌面，禁止重复安装" && exit ;;
+    esac
+fi
+
 
 # Set UP APT Sources -------------------------------------------------------------------------------
 sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources
@@ -38,3 +51,4 @@ echo "#!/bin/bash"                               > /run.sh
 echo 'echo Starting Basic Server ------------'  >> /run.sh
 echo 'nohup /usr/sbin/sshd -D &'                >> /run.sh
 systemctl enable run && systemctl start run
+echo 0 > /etc/lxc-ssh-flag

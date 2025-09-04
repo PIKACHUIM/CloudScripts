@@ -1,4 +1,17 @@
 #!/bin/bash
+# Check -----------------------------------------------------------
+file="/etc/lxc-ssh-flag"
+if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
+    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
+	apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
+else
+    read -r content < "$file"      # 去掉前后空白，只读第一行
+    case "$content" in
+        0) apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e ;;
+        9) echo "检查通过，开始安装桌面....." ;;
+        *) echo "已经安装过桌面，禁止重复安装" && exit ;;
+    esac
+fi
 
 # GNOME3 ------------------------------------------------------
 DEBIAN_FRONTEND=noninteractive apt install -y gnome curl

@@ -1,8 +1,24 @@
 #!/bin/bash
+# Check -----------------------------------------------------------
+file="/etc/lxc-ssh-flag"
+if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
+    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
+	apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
+else
+    read -r content < "$file"      # 去掉前后空白，只读第一行
+    case "$content" in
+        0) apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e ;;
+        9) echo "已经安装过X11，禁止重复安装" && exit ;;
+        *) echo "已经安装过桌面，禁止重复安装" && exit ;;
+    esac
+fi
 
 # Install Xserver -------------------------------------------------
 echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d
-apt-get update && DEBIAN_FRONTEND=noninteractiveapt install -y   \
+DEBIAN_FRONTEND=noninteractive apt update && /sbin/init & 
+DEBIAN_FRONTEND=noninteractive apt install -y pulseaudio 
+apt install apt-transport-https ca-certificates curl   -y
+apt update && DEBIAN_FRONTEND=noninteractiveapt install -y   \
 xserver-xorg-core xauth xorg xserver-xorg-video-dummy xinit xvfb \
 dbus-x11 x11-xserver-utils
 echo 'allowed_users=anybody' > /etc/X11/Xwrapper.config
@@ -42,3 +58,4 @@ echo '/etc/NX/nxserver --startup'               >> /run.sh
 echo '/etc/NX/nxserver --restart'               >> /run.sh
 echo 'echo Starting VNC ---------------------'  >> /run.sh
 echo 'export HOME=/root && bash /x11vnc.sh   '  >> /run.sh
+echo 9 > /etc/lxc-ssh-flag
