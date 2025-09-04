@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Lingmo ------------------------------------------------------
-DEBIAN_FRONTEND=noninteractive apt update  &&  /sbin/init & 
 UR="deb https://download.opensuse.org/repositories/home:"
 DE="${UR}/elysia:/LingmoOS/Debian_12/ ./"
 KR="https://build.opensuse.org/projects/home:"
