@@ -15,21 +15,16 @@ apt install apt-transport-https ca-certificates curl   -y
 DEBIAN_FRONTEND=noninteractive apt install -y pulseaudio 
 SRC="repo.gxde.top/gxde-os/${VER}/g/gxde-source/" 
 wget https://${SRC}gxde-source_1.1.10_all.deb -O gxde.deb 
-dpkg -i gxde.deb && rm -rf gxde.deb && apt install sudo -y
-apt update && apt install -y aptss gxde-testing-source   
-apt install gxde-desktop spark-store --install-recommends -y
-apt update && apt install gxde-desktop-extra firefox-esr  -y    
+dpkg -i gxde.deb && rm -rf gxde.deb
+apt install -y aptss gxde-testing-sourc && apt update 
+apt install gxde-desktop --install-recommends -y
+apt install gxde-desktop-extra firefox-esr spark-store   -y   
 
-# Startup Desktop ---------------------------------------------
-cat > /x11vnc.sh <<'EOF'
-nohup x11vnc -forever -noxdamage -repeat -rfbauth \
-/etc/x11vnc.pass -rfbport 5900 -shared -create -display :9 &
-EOF
+# X11RDP ------------------------------------------------------ 
+update-alternatives --set x-session-manager /usr/bin/startdde
 
 # Startup Desktop ---------------------------------------------
 echo 'echo Starting Desktop Runtime ----------'  >> /run.sh
 echo 'export DISPLAY=:9 &&export $(dbus-launch)' >> /run.sh
 echo 'nohup Xvfb :9 -ac -screen 0 1600x900x24 &' >> /run.sh
-echo 'chmod +x /x11vnc.sh && export HOME=/root ' >> /run.sh
-echo 'bash /x11vnc.sh && nohup startdde &      ' >> /run.sh
-
+echo 'nohup startdde &                         ' >> /run.sh

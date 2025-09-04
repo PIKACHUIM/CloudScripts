@@ -7,7 +7,7 @@ apt update && apt install -y openssh-server sudo vim nano wget curl gnupg2 git o
 
 # Allow SSH PAM & Password Login -------------------------------------------------------------------
 mkdir -p /var/run/sshd && mkdir -p /root/.ssh/
-echo "PermitRootLogin without-password" >> /etc/ssh/sshd_config
+echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
 echo "ListenAddress 0.0.0.0" >> /etc/ssh/sshd_config
 
 # User ---------------------------------------------------------------------------------------------
@@ -34,6 +34,7 @@ WantedBy=multi-user.target
 EOF
 
 # Init ---------------------------------------------------------------------------------------------
-echo "#!/bin/bash" > /run.sh
+echo "#!/bin/bash"                               > /run.sh
 echo 'echo Starting Basic Server ------------'  >> /run.sh
 echo 'nohup /usr/sbin/sshd -D &'                >> /run.sh
+systemctl enable run && systemctl start run
