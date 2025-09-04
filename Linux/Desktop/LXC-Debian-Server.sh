@@ -1,15 +1,15 @@
 #!/bin/bash
 
 UR="mirrors.tuna.tsinghua.edu.cn"
-if [ "$OS_VERSION" = "trixie" ] || [ "$OS_VERSION" = "bookworm" ]; then                           \
-        cp /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list.d/debian.sources.bak      \
-        && sed -i 's/deb.debian.org/'${UR}'/g' /etc/apt/sources.list.d/debian.sources             \     
-        && sed -i "s/main/main contrib non-free/g" /etc/apt/sources.list.d/debian.sources         \
-        && sed -i 's/security.debian.org/'${UR}'/g' /etc/apt/sources.list.d/debian.sources        \
-    ;else                                                                                         \
-        cp /etc/apt/sources.list /etc/apt/sources.list.bak                                        \
-        && sed -i 's/deb.debian.org/'${UR}'/g' /etc/apt/sources.list                              \     
-        && sed -i 's/security.debian.org/'${UR}'/g' /etc/apt/sources.list                         \
+if [ "$OS_VERSION" = "trixie" ] || [ "$OS_VERSION" = "bookworm" ]; then                           
+        cp /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list.d/debian.sources.bak      
+        && sed -i 's/deb.debian.org/'${UR}'/g' /etc/apt/sources.list.d/debian.sources                 
+        && sed -i "s/main/main contrib non-free/g" /etc/apt/sources.list.d/debian.sources         
+        && sed -i 's/security.debian.org/'${UR}'/g' /etc/apt/sources.list.d/debian.sources        
+    ;else                                                                                         
+        cp /etc/apt/sources.list /etc/apt/sources.list.bak                                        
+        && sed -i 's/deb.debian.org/'${UR}'/g' /etc/apt/sources.list                                   
+        && sed -i 's/security.debian.org/'${UR}'/g' /etc/apt/sources.list                         
     ;fi
 	
 apt update && apt install -y openssh-server sudo vim nano 
