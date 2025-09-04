@@ -27,7 +27,7 @@ apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.
   - ##### 安装Server环境
 
     ```shell
-    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash
+    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
     ```
   
     
@@ -35,7 +35,7 @@ apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.
   - ##### 安装X11GUI环境
 
     ```shell
-    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash
+    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
     ```
   
     
@@ -43,7 +43,7 @@ apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.
   - ##### 安装DDE Deepin
 
     ```shell
-    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Deepin.sh | bash
+    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Deepin.sh | bash -e
     ```
   
     
@@ -51,7 +51,7 @@ apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.
   - ##### 安装KDE Plasma
 
     ```shell
-    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Plasma.sh | bash
+    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Plasma.sh | bash -e
     ```
   
     
@@ -59,7 +59,7 @@ apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.
   - ##### 安装KDE Lingmo
 
     ```shell
-    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Lingmo.sh | bash
+    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Lingmo.sh | bash -e
     ```
   
     
@@ -67,7 +67,7 @@ apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.
   - ##### 安装ENV Xfce4L
 
     ```shell
-    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Xfce4L.sh | bash
+    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Xfce4L.sh | bash -e
     ```
   
     
@@ -75,11 +75,18 @@ apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.
   - ##### 安装ENV GNOME3
 
     ```shell
-    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-GNOME3.sh | bash
+    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Gnome3.sh | bash -e
     ```
+  
+    
 
+  - ##### 安装ENV MateDE
 
-  - 
+    ```shell
+    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-MateDE.sh | bash -e
+    ```
+  
+    
 
 - #### Ubuntu 桌面安装
 
