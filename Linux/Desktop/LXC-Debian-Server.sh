@@ -1,6 +1,7 @@
 #!/bin/bash
 # Check -----------------------------------------------------------
 file="/etc/lxc-de-flag"
+set -e
 if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
     echo "检查通过，开始安装服务环境....."
 else
