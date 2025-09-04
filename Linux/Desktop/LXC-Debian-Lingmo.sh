@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Lingmo ------------------------------------------------------
+DEBIAN_FRONTEND=noninteractive apt update  &&  /sbin/init & 
+UR="deb https://download.opensuse.org/repositories/home:"
+DE="${UR}/elysia:/LingmoOS/Debian_12/ ./"
+KR="https://build.opensuse.org/projects/home:"
+KF="${KR}elysia:LingmoOS/signing_keys/download?kind=gpg"
+echo ${DE} >> /etc/apt/sources.list                  ||echo 1
+apt -y install wget gnupg2 nano vim openssl curl git ||echo 3
+wget ${KF} -O /etc/apt/trusted.gpg.d/lingmo.asc      ||echo 4
+apt update &&DEBIAN_FRONTEND=noninteractive apt install -y \
+    lingmo-workspace-base psmisc
+cat > /lingmo.sh <<'EOF'
+#!/usr/bin/env bash
+#------------------
+set_session_env() {
+    SESSION_2="lingmo-session"
+
+    # Adding dbus-launch may cause problems with vscode.
+    #
+    DBUS_CMD="dbus-launch"
+
+    [[ ! -s /etc/environment ]] || source /etc/environment
+    # /run/user/$UID
+    [[ -n ${XDG_RUNTIME_DIR} ]] || export XDG_RUNTIME_DIR=/tmp/runtime-${UID}
+    [[ -e ${XDG_RUNTIME_DIR} ]] || mkdir -pv ${XDG_RUNTIME_DIR}
+}
+
+start_session() {
+    for i in ${SESSION_2}; do
+        if [[ -n $(command -v $i) ]]; then
+            exec ${DBUS_CMD} ${i} ${@}
+            break
+        fi
+    done
+}
+set_session_env
+start_session ${@}
+
+EOF
+RUN chmod 755 /lingmo.sh
+
+
+# X11RDP ------------------------------------------------------ 
+update-alternatives --set x-session-manager /lingmo.sh
+
+# Startup Desktop ---------------------------------------------
+echo 'echo Starting Desktop Runtime -----------' >> /run.sh
+echo 'export DISPLAY=:9 &&export $(dbus-launch)' >> /run.sh
+echo 'nohup Xvfb :9 -ac -screen 0 1600x900x24 &' >> /run.sh
+echo 'nohup /lingmo.sh & && killall lingmo-dock' >> /run.sh
