@@ -34,4 +34,7 @@ WantedBy=multi-user.target
 EOF
 
 # Init ---------------------------------------------------------------------------------------------
+service enable sshd
 echo "#!/bin/bash" > /run.sh
+echo 'echo Starting Basic Server ------------'  >> /run.sh
+echo 'nohup /usr/sbin/sshd -D &'                >> /run.sh

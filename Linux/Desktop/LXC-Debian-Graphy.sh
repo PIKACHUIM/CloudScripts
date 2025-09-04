@@ -174,8 +174,7 @@ DEBIAN_FRONTEND=noninteractive apt -y install xrdp
 DEBIAN_FRONTEND=noninteractive apt -y install x11vnc
 
 # Start Setup -----------------------------------------------------
-echo '#!/bin/bash'                               > /run.sh
-echo 'echo Starting Basic Server ------------'  >> /run.sh
+echo 'echo Starting Graph Runtime -----------'  >> /run.sh
 echo 'nohup /usr/sbin/sshd -D &'                >> /run.sh
 echo 'export DISPLAY=:0'                        >> /run.sh
 echo '/etc/init.d/dbus start'                   >> /run.sh
