@@ -4,7 +4,7 @@
 echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d
 apt-get update && DEBIAN_FRONTEND=noninteractive              \
     apt install -y xserver-xorg-core xauth xorg wget gnupg2   \
-                   xserver-xorg-video-dummy curl  net-tools   \   
+                   xserver-xorg-video-dummy curl net-tools    \   
                    xfonts-base xfonts-75dpi xfonts-100dpi git \
                    xfonts-scalable dbus-user-session          \
                    dbus-x11 xinit
