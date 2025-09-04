@@ -19,7 +19,7 @@ apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.
     ```shell
     sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources
     sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
-    apt update
+    apt update && apt upgrade
     ```
     
     
