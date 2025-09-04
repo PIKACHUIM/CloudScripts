@@ -14,8 +14,8 @@ fi
 
 
 # Set UP APT Sources -------------------------------------------------------------------------------
-sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources
-sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
+sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources \
+|| sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
 apt update && apt install -y openssh-server sudo vim nano wget curl gnupg2 git openssl
 
 # Allow SSH PAM & Password Login -------------------------------------------------------------------
