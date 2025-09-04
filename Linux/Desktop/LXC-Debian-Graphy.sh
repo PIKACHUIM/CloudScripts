@@ -8,7 +8,7 @@ if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
 else
     read -r content < "$file"      # 去掉前后空白，只读第一行
     case "$content" in
-        0) apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e ;;
+        0) echo "检查通过，开始安装X11环境....." ;;
         9) echo "已经安装过X11，禁止重复安装" && exit ;;
         *) echo "已经安装过桌面，禁止重复安装" && exit ;;
     esac
