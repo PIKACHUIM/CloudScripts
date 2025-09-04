@@ -56,7 +56,7 @@ chmod 755 /lingmo.sh
 
 
 # X11RDP ------------------------------------------------------ 
-update-alternatives --set x-session-manager /lingmo.sh
+# update-alternatives --set x-session-manager /lingmo.sh
 
 # Startup Desktop ---------------------------------------------
 echo 'echo Starting Desktop Runtime -----------' >> /run.sh
