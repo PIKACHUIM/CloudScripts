@@ -52,7 +52,7 @@ set_session_env
 start_session ${@}
 
 EOF
-RUN chmod 755 /lingmo.sh
+chmod 755 /lingmo.sh
 
 
 # X11RDP ------------------------------------------------------ 
