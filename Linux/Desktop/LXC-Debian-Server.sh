@@ -51,4 +51,4 @@ echo "#!/bin/bash"                               > /run.sh
 echo 'echo Starting Basic Server ------------'  >> /run.sh
 echo 'nohup /usr/sbin/sshd -D &'                >> /run.sh
 systemctl enable run && systemctl start run
-echo 0 > /etc/lxc-ssh-flag
+echo 0 > /etc/lxc-de-flag

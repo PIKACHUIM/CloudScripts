@@ -26,3 +26,4 @@ echo 'echo Starting Desktop Runtime -----------' >> /run.sh
 echo 'export DISPLAY=:9 &&export $(dbus-launch)' >> /run.sh
 echo 'nohup Xvfb :9 -ac -screen 0 1600x900x24 &' >> /run.sh
 echo 'nohup /usr/bin/xfce4-session &           ' >> /run.sh
+echo 4 > /etc/lxc-de-flag
