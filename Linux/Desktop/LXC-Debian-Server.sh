@@ -24,7 +24,7 @@ echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
 echo "ListenAddress 0.0.0.0" >> /etc/ssh/sshd_config
 
 # User ---------------------------------------------------------------------------------------------
-touch /run.sh && chmod +x /run.sh && rm /etc/pam.d/sshd && mkdir -p /run/sshd
+touch /run.sh && chmod +x /run.sh
 groupadd -r -g 2000 user &&  useradd -u 2000 -m -r -g user user
 echo "user ALL=(ALL)      ALL" >> /etc/sudoers
 
