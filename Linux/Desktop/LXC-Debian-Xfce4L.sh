@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Xfce4L ------------------------------------------------------
-DEBIAN_FRONTEND=noninteractive apt install-y  fonts-noto-cjk xfce4
+DEBIAN_FRONTEND=noninteractive apt install -y fonts-noto-cjk xfce4
 DEBIAN_FRONTEND=noninteractive apt install -y xfce4-goodies git
 
 
