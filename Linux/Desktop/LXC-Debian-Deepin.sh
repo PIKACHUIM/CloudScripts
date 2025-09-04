@@ -32,7 +32,7 @@ wget https://${SRC}gxde-source_1.1.10_all.deb -O gxde.deb
 dpkg -i gxde.deb && rm -rf gxde.deb && apt update
 apt install -y gxde-testing-source && apt update 
 apt install -y  gxde-desktop --install-recommends
-apt install -y  gxde-desktop-extra 
+# apt install -y  gxde-desktop-extra 
 apt install -y  firefox-esr spark-store    
 
 # X11RDP ------------------------------------------------------ 
