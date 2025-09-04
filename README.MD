@@ -11,11 +11,9 @@
     ```shell
     sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources
     sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
-    sed -i 's/security.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources
-    sed -i 's/security.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
     apt update
     ```
-
+    
     
 
   - ##### 安装Server环境
@@ -23,7 +21,7 @@
     ```shell
     apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash
     ```
-
+  
     
 
   - ##### 安装X11GUI环境
@@ -31,7 +29,7 @@
     ```shell
     apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash
     ```
-
+  
     
 
   - ##### 安装DDE Deepin
@@ -39,7 +37,7 @@
     ```shell
     apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Deepin.sh | bash
     ```
-
+  
     
 
   - ##### 安装KDE Plasma
@@ -47,7 +45,7 @@
     ```shell
     apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Plasma.sh | bash
     ```
-
+  
     
 
   - ##### 安装KDE Lingmo
@@ -55,7 +53,7 @@
     ```shell
     apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Lingmo.sh | bash
     ```
-
+  
     
 
   - ##### 安装ENV Xfce4L
@@ -63,7 +61,7 @@
     ```shell
     apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Xfce4L.sh | bash
     ```
-
+  
     
 
   - ##### 安装ENV GNOME3
