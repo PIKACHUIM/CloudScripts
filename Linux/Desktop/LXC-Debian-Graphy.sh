@@ -1,6 +1,6 @@
 #!/bin/bash
 # Check -----------------------------------------------------------
-file="/etc/lxc-ssh-flag"
+file="/etc/lxc-de-flag"
 if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
     apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
 	apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e

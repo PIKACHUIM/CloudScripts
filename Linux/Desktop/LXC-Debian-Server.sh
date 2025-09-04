@@ -1,8 +1,8 @@
 #!/bin/bash
 # Check -----------------------------------------------------------
-file="/etc/lxc-ssh-flag"
+file="/etc/lxc-de-flag"
 if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
-    echo "检查通过，开始安装服务环境....." ;;
+    echo "检查通过，开始安装服务环境....."
 else
     read -r content < "$file"      # 去掉前后空白，只读第一行
     case "$content" in
