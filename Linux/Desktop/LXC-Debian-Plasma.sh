@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Plasma ------------------------------------------------------
-DEBIAN_FRONTEND=noninteractive apt update  &&  /sbin/init & 
-DEBIAN_FRONTEND=noninteractive kde-plasma-desktop
+DEBIAN_FRONTEND=noninteractive apt install -y kde-plasma-desktop
 
 
 # X11RDP ------------------------------------------------------ 
