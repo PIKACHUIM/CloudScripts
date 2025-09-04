@@ -12,3 +12,16 @@ dpkg -i gxde.deb && rm -rf gxde.deb && apt install sudo -y
 apt update && apt install -y aptss gxde-testing-source   
 apt install gxde-desktop spark-store --install-recommends -y
 apt update && apt install gxde-desktop-extra firefox-esr  -y    
+
+# Startup Desktop ---------------------------------------------
+cat > /x11vnc.sh <<'EOF'
+nohup x11vnc -forever -noxdamage -repeat -rfbauth \
+/etc/x11vnc.pass -rfbport 5900 -shared -create -display :9 &
+EOF
+
+# Startup Desktop ---------------------------------------------
+echo 'export DISPLAY=:9 &&export $(dbus-launch)' >> /run.sh
+echo 'nohup Xvfb :9 -ac -screen 0 1600x900x24 &' >> /run.sh
+echo 'chmod +x /x11vnc.sh && export HOME=/root ' >> /run.sh
+echo 'bash /x11vnc.sh && nohup startdde &      ' >> /run.sh
+
