@@ -2,7 +2,15 @@
 
 ## Linux脚本
 
-### 1.安装图形化桌面
+### 清理Linux 垃圾
+
+```shell
+apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.sh | bash
+```
+
+
+
+### 安装图形化桌面
 
 - #### Debian 桌面安装
 
@@ -73,7 +81,7 @@
 
   - 
 
-###  2. Ubuntu 桌面安装
+- #### Ubuntu 桌面安装
 
 
 
