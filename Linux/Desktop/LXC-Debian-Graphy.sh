@@ -19,7 +19,7 @@ echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d
 DEBIAN_FRONTEND=noninteractive apt update && /sbin/init & 
 DEBIAN_FRONTEND=noninteractive apt install -y pulseaudio 
 apt install apt-transport-https ca-certificates curl   -y
-apt update && DEBIAN_FRONTEND=noninteractiveapt install -y   \
+apt update && DEBIAN_FRONTEND=noninteractive apt install -y   \
 xserver-xorg-core xauth xorg xserver-xorg-video-dummy xinit xvfb \
 dbus-x11 x11-xserver-utils
 echo 'allowed_users=anybody' > /etc/X11/Xwrapper.config

@@ -8,8 +8,6 @@
 apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.sh | bash
 ```
 
-
-
 ### 安装图形化桌面
 
 - #### Debian 桌面安装
