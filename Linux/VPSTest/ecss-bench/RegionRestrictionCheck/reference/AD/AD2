@@ -1,0 +1,15 @@
+#!/bin/bash
+Font_Red="\033[31m"
+Font_BrightGreen="\033[92m"
+Font_BrightYellow="\033[93m"
+Font_BrightBlue="\033[94m"
+Font_BrightPurple="\033[95m"
+Font_Orange="\033[38;5;208m"
+Font_Suffix="\033[0m"
+
+echo -e "${Font_BrightBlue}====================【推广贰】====================${Font_Suffix}"
+echo -e " ${Font_BrightGreen}★ Instagram音乐及其他流媒体解锁 ★${Font_Suffix}"
+echo -e "  ${Font_Orange}价格低至 USD1.0/月${Font_Suffix}"
+echo -e "  ${Font_BrightYellow}👉 自助下单购买: https://t.me/TailUnlockBot${Font_Suffix}"
+echo -e "  ${Font_BrightPurple}📢 了解详情请关注频道: https://t.me/LMT_Unblock${Font_Suffix}"
+echo -e "${Font_BrightBlue}================================================${Font_Suffix}"
