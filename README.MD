@@ -44,14 +44,14 @@ apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.
   
   | 桌面/环境 | 简介 | 使用命令 |
   | --------- | ---- | -------- |
-  | Server 基础环境 | 初始化系统与常用依赖，准备图形/桌面安装 | `apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh \| bash -e` |
-  | X11 图形栈 | 安装 X11 与基础图形组件，为桌面打底 | `apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh \| bash -e` |
-  | Deepin/GXDE 桌面 | 中文友好、易用美观的 Deepin 风格桌面（GXDE） | `apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Deepin.sh \| bash -e` |
-  | KDE Plasma 桌面 | 高度可定制、功能全面的现代桌面 | `apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Plasma.sh \| bash -e` |
-  | KDE Lingmo 桌面 | KDE 的国风变体，界面现代、整合优化 | `apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Lingmo.sh \| bash -e` |
-  | Xfce 轻量桌面 | 资源占用低、稳定流畅，适合轻量环境 | `apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Xfce4L.sh \| bash -e` |
-  | GNOME 3 桌面 | 简洁现代、工作流导向的桌面体验 | `apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Gnome3.sh \| bash -e` |
-  | MATE 经典桌面 | 传统菜单与窗口风格，稳定耐用 | `apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-MateDE.sh \| bash -e` |
+  | Server 基础环境 | 初始化系统与常用依赖，准备图形/桌面安装 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e` |
+  | X11 图形栈 | 安装 X11 与基础图形组件，为桌面打底 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e` |
+  | Deepin/GXDE 桌面 | 中文友好、易用美观的 Deepin 风格桌面（GXDE） | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Deepin.sh | bash -e` |
+  | KDE Plasma 桌面 | 高度可定制、功能全面的现代桌面 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Plasma.sh | bash -e` |
+  | KDE Lingmo 桌面 | KDE 的国风变体，界面现代、整合优化 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Lingmo.sh | bash -e` |
+  | Xfce 轻量桌面 | 资源占用低、稳定流畅，适合轻量环境 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Xfce4L.sh | bash -e` |
+  | GNOME 3 桌面 | 简洁现代、工作流导向的桌面体验 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Gnome3.sh | bash -e` |
+  | MATE 经典桌面 | 传统菜单与窗口风格，稳定耐用 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-MateDE.sh | bash -e` |
   
     
 
