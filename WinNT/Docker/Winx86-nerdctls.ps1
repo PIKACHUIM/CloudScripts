@@ -94,6 +94,9 @@ param(
     $TransparentNetwork
 )
 
+# Prefix for GitHub download URLs to accelerate access
+$GitHubMirrorPrefix = "https://ghfast.top/"
+
 $global:RebootRequired = $false
 
 $global:ErrorFile = "$pwd\install-container-runtime.err"
@@ -252,7 +255,7 @@ New-ContainerTransparentNetwork
     # Download and Install powershell module HNS-Network
     $containerdPath='C:\Program Files\containerd\cni\bin\'
     if (-not (Test-Path $containerdPath)){
-        curl.exe -LO https://github.com/microsoft/windows-container-networking/releases/download/v0.3.0/windows-container-networking-cni-amd64-v0.3.0.zip
+        curl.exe -LO "$GitHubMirrorPrefixhttps://github.com/microsoft/windows-container-networking/releases/download/v0.3.0/windows-container-networking-cni-amd64-v0.3.0.zip"
         Expand-Archive -Path .\windows-container-networking-cni-amd64-v0.3.0.zip -DestinationPath $containerdPath
     }
     curl.exe -LO https://raw.githubusercontent.com/microsoft/SDN/master/Kubernetes/windows/hns.psm1
@@ -574,19 +577,19 @@ Install-Containerd()
     if (!(Test-Path $WinCNIPath)) { mkdir -Force -Path $WinCNIPath | Out-Null }
 
     $ContainerdZip = "containerd-$ContainerDVersion-windows-amd64.tar.gz"
-    Copy-File "https://github.com/containerd/containerd/releases/download/v$ContainerDVersion/$ContainerdZip" "$ContainerdPath\$ContainerdZip"
+    Copy-File "$GitHubMirrorPrefixhttps://github.com/containerd/containerd/releases/download/v$ContainerDVersion/$ContainerdZip" "$ContainerdPath\$ContainerdZip"
     tar.exe -xvf "$ContainerdPath\$ContainerdZip" -C $ContainerdPath
     Write-Output "Containerd binaries added to $ContainerdPath"
 
     #Download and extract nerdctl binaries
     $NerdCTLZip = "nerdctl-$NerdCTLVersion-windows-amd64.tar.gz"
-    Copy-File "https://github.com/containerd/nerdctl/releases/download/v$NerdCTLVersion/$NerdCTLZip" "$NerdCTLPath\$NerdCTLZip"
+    Copy-File "$GitHubMirrorPrefixhttps://github.com/containerd/nerdctl/releases/download/v$NerdCTLVersion/$NerdCTLZip" "$NerdCTLPath\$NerdCTLZip"
     tar.exe -xvf "$NerdCTLPath\$NerdCTLZip" -C $NerdCTLPath
     Write-Output "NerdCTL binary added to $NerdCTLPath"
 
     #Download and extract win cni binaries
     $WinCNIZip = "windows-container-networking-cni-amd64-v$WinCNIVersion.zip"
-    Copy-File "https://github.com/microsoft/windows-container-networking/releases/download/v$WinCNIVersion/$WinCNIZip" "$WinCNIPath\$WinCNIZip"
+    Copy-File "$GitHubMirrorPrefixhttps://github.com/microsoft/windows-container-networking/releases/download/v$WinCNIVersion/$WinCNIZip" "$WinCNIPath\$WinCNIZip"
     tar.exe -xvf "$WinCNIPath\$WinCNIZip" -C $WinCNIPath
     Write-Output "CNI plugin binaries added to $WinCNIPath"
 
