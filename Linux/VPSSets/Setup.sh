@@ -73,7 +73,8 @@ read PROXYS_USAGES
 if [ "$PROXYS_USAGES" = "y" ]; then
     IP_ADDR=$(getent hosts ${PROXY_HOST} | awk '{print $1}')
 	PC_COMM="proxychains"
-	echo socks5 ${IP_ADDR} ${PROXY_PORT} ${PROXY_AUTH}
+	sed -i '/\[ProxyList\]/{n;,$d}' /etc/proxychains.conf
+	echo "socks5 ${IP_ADDR} ${PROXY_PORT} ${PROXY_AUTH}" >> /etc/proxychains.conf
 fi
 
 
