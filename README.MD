@@ -2,6 +2,15 @@
 
 ## Linux脚本
 
+### 服务器安装脚本
+
+
+#### NAT VPS服务自动构建
+
+```shell
+bash <(curl https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh)
+```
+
 ### 服务器测评脚本
 
 | 脚本            | 简介                                                         | 使用命令                                                     |
