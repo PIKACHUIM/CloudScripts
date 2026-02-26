@@ -6,10 +6,18 @@
 # ============================================================
 
 # 验证密码
+clear
+echo "======================================================="
+echo "                皮卡丘服务器部署脚本                   "
+echo "======================================================="
 echo -n "请输入部署密码: "
 read -s _PASS
 echo
-_dec() { echo "$1" | openssl enc -aes-256-cbc -pbkdf2 -d -a -pass pass:"${_PASS}" 2>/dev/null; }
+_dec() {
+    local _OUT
+    _OUT=$(echo "$1" | openssl enc -aes-256-cbc -pbkdf2 -d -a -pass pass:"${_PASS}" 2>/dev/null)
+    [ $? -eq 0 ] && echo "$_OUT" || echo ""
+}
 
 # ---- 加密的敏感信息（使用 Vault.sh 生成） ----
 ENC_PROXY_AUTH=U2FsdGVkX19nQItQVnIlhqIDn7QBNXcEEVmmzKrw75c=
@@ -47,10 +55,13 @@ GH_WEB="https://ghfast.top/https://github.com"
 GH_API="https://ghproxy.vip/https://api.github.com/"
 
 # 设置主机名 ========================================================
-echo "请输入新的主机名:"
+echo -n "请输入新的主机名:"
 read HS_DAT
-hostnamectl set-hostname ${HS_DAT}
-echo "127.0.0.1 ${HS_DAT}" >> /etc/hosts
+if [ "$HS_DAT" ]; then
+    hostnamectl set-hostname ${HS_DAT}
+    echo "127.0.0.1 ${HS_DAT}" >> /etc/hosts
+fi
+
 
 # 系统初始安装 ======================================================
 apt update&& apt upgrade -y && apt install -y curl wget nano sudo vim
@@ -64,7 +75,7 @@ curl -o- ${NJ_URL} | bash && source ~/.bashrc
 apt install -y unzip htop git openssl proxychains&&npm install pm2 -g
 
 # 安装代理工具 ======================================================
-echo -n "是否使用ProxyChains? (y/n): "
+echo -n "使用ProxyChains4? (y/n): "
 read PROXYS_USAGES
 if [ "$PROXYS_USAGES" = "y" ]; then
     IP_ADDR=$(getent hosts ${PROXY_HOST} | awk '{print $1}')
@@ -124,7 +135,7 @@ if [ "$INSTALL_3XUI" = "y" ]; then
 fi
 
 # 安装ET服务 ========================================================
-echo -n "是否安装ET服务? (y/n): "
+echo -n "是否安装EasyTier? (y/n): "
 read INSTALL_ET
 if [ "$INSTALL_ET" = "y" ]; then
     # 自动从GitHub读取最新的tag
@@ -153,7 +164,7 @@ if [ "$INSTALL_ET" = "y" ]; then
 fi
 
 # 安装FRPS服务器 ====================================================
-echo -n "是否设置FRPS服务器? (y/n): "
+echo -n "是否设置FRPS服务? (y/n): "
 read INSTALL_FRPS
 if [ "$INSTALL_FRPS" = "y" ]; then
     # 通过GitHub API获取最新frp-panel版本
