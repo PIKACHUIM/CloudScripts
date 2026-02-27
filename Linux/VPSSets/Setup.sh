@@ -68,7 +68,7 @@ apt update && apt upgrade -y && apt install -y curl wget nano sudo
 apt install -y unzip htop git openssl proxychains vim
 
 # 安装代理工具 ======================================================
-echo -n "使用ProxyChains4? (y/n): "
+echo -n "使用ProxyChains4? (y/N): "
 read PROXYS_USAGES
 if [ "$PROXYS_USAGES" = "y" ]; then
   IP_ADDR=$(getent hosts ${PROXY_HOST} | awk '{print $1}')
@@ -85,7 +85,7 @@ fi
 
 
 # 安装NodeJS24 ======================================================
-echo -n "是否安装NODEJS24? (y/n): "
+echo -n "是否安装NODEJS24? (y/N): "
 read INSTALL_NODEJS
 if [ "$INSTALL_NODEJS" = "y" ]; then
   NJ_URL="${GH_URL}/nvm-sh/nvm/v0.40.3/install.sh"
@@ -97,7 +97,7 @@ if [ "$INSTALL_NODEJS" = "y" ]; then
 fi
 
 # 安装宝塔面板 ======================================================
-echo -n "是否安装宝塔面板? (y/n): "
+echo -n "是否安装宝塔面板? (y/N): "
 read INSTALL_BAOTA
 if [ "$INSTALL_BAOTA" = "y" ]; then
     BT_URL="https://download.bt.cn/install/install_panel.sh"
@@ -113,7 +113,7 @@ if [ "$INSTALL_BAOTA" = "y" ]; then
 fi
 
 # 安装哪吒面板 ======================================================
-echo -n "是否安装哪吒面板? (y/n): "
+echo -n "是否安装哪吒面板? (y/N): "
 read INSTALL_NEZHA
 if [ "$INSTALL_NEZHA" = "y" ]; then
     NZ_URL="${GH_URL}/nezhahq/scripts/main/agent/install.sh"
@@ -125,7 +125,7 @@ if [ "$INSTALL_NEZHA" = "y" ]; then
 fi
 
 # 安装3XUI面板 ======================================================
-echo -n "是否安装3XUI面板? (y/n): "
+echo -n "是否安装3XUI面板? (y/N): "
 read INSTALL_3XUI
 if [ "$INSTALL_3XUI" = "y" ]; then
 	mkdir -p /etc/xui
@@ -148,7 +148,7 @@ if [ "$INSTALL_3XUI" = "y" ]; then
 fi
 
 # 安装ET服务 ========================================================
-echo -n "是否安装EasyTier? (y/n): "
+echo -n "是否安装EasyTier? (y/N): "
 read INSTALL_ET
 if [ "$INSTALL_ET" = "y" ]; then
     # 自动从GitHub读取最新的tag
@@ -177,7 +177,7 @@ if [ "$INSTALL_ET" = "y" ]; then
 fi
 
 # 安装FRPS服务器 ====================================================
-echo -n "是否设置FRPS服务? (y/n): "
+echo -n "是否设置FRPS服务? (y/N): "
 read INSTALL_FRPS
 if [ "$INSTALL_FRPS" = "y" ]; then
     # 通过GitHub API获取最新frp-panel版本
@@ -197,3 +197,49 @@ if [ "$INSTALL_FRPS" = "y" ]; then
 	          --rpc-url ${FRP_RPC}
 	pm2 save
 fi
+
+# 端口限速 ==========================================================
+setup_rate_limit() {
+    local IFACE PORTS RATE
+    IFACE=$(ip route | grep default | awk '{print $5}' | head -1)
+    PORTS=(1040 1041)
+    RATE="1mbit"
+
+    # 清理旧规则
+    tc qdisc del dev ${IFACE} root 2>/dev/null
+    tc qdisc del dev ${IFACE} ingress 2>/dev/null
+    ip link set ifb0 down 2>/dev/null
+    ip link del ifb0 2>/dev/null
+
+    # 出方向限速
+    tc qdisc add dev ${IFACE} root handle 1: htb default 999
+    tc class add dev ${IFACE} parent 1: classid 1:999 htb rate 1000mbit
+    tc class add dev ${IFACE} parent 1: classid 1:10 htb rate ${RATE} ceil ${RATE}
+    for PORT in "${PORTS[@]}"; do
+        tc filter add dev ${IFACE} parent 1: protocol ip u32 match ip dport ${PORT} 0xffff flowid 1:10
+        tc filter add dev ${IFACE} parent 1: protocol ip u32 match ip sport ${PORT} 0xffff flowid 1:10
+    done
+
+    # 入方向限速（通过 IFB）
+    modprobe ifb 2>/dev/null
+    ip link add ifb0 type ifb 2>/dev/null
+    ip link set ifb0 up
+    tc qdisc add dev ${IFACE} ingress
+    tc filter add dev ${IFACE} parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb0
+    tc qdisc add dev ifb0 root handle 2: htb default 999
+    tc class add dev ifb0 parent 2: classid 2:999 htb rate 1000mbit
+    tc class add dev ifb0 parent 2: classid 2:10 htb rate ${RATE} ceil ${RATE}
+    for PORT in "${PORTS[@]}"; do
+        tc filter add dev ifb0 parent 2: protocol ip u32 match ip dport ${PORT} 0xffff flowid 2:10
+        tc filter add dev ifb0 parent 2: protocol ip u32 match ip sport ${PORT} 0xffff flowid 2:10
+    done
+
+    echo "端口限速已启用: ${PORTS[*]} 限速 ${RATE}"
+}
+
+echo -n "是否对端口限速? (y/N): "
+read INSTALL_RATELIMIT
+if [ "$INSTALL_RATELIMIT" = "y" ]; then
+    setup_rate_limit
+fi
+
