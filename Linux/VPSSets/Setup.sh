@@ -52,7 +52,7 @@ BT_USER=$(_dec "$ENC_BT_USER")
 
 GH_URL="https://ghfast.top/https://raw.githubusercontent.com"
 GH_WEB="https://ghfast.top/https://github.com"
-GH_API="https://ghproxy.vip/https://api.github.com/"
+GH_API="https://ghproxy.vip/https://api.github.com"
 
 # 设置主机名 ========================================================
 echo -n "请输入新主机名:"
@@ -71,17 +71,23 @@ apt install -y unzip htop git openssl proxychains vim
 echo -n "使用ProxyChains4? (y/n): "
 read PROXYS_USAGES
 if [ "$PROXYS_USAGES" = "y" ]; then
-    IP_ADDR=$(getent hosts ${PROXY_HOST} | awk '{print $1}')
+  IP_ADDR=$(getent hosts ${PROXY_HOST} | awk '{print $1}')
 	PC_COMM="proxychains"
-	sed -i '/\[ProxyList\]/{n;,$d}' /etc/proxychains.conf
-	echo "socks5 ${IP_ADDR} ${PROXY_PORT} ${PROXY_AUTH}" >> /etc/proxychains.conf
+	cat > /etc/proxychains.conf << EOF
+strict_chain
+proxy_dns
+tcp_read_time_out 15000
+tcp_connect_time_out 8000
+[ProxyList]
+socks5 ${IP_ADDR} ${PROXY_PORT} ${PROXY_AUTH}
+EOF
 fi
 
 
 # 安装NodeJS24 ======================================================
 echo -n "是否安装NODEJS24? (y/n): "
 read INSTALL_NODEJS
-if [ "INSTALL_NODEJS" = "y" ]; then
+if [ "$INSTALL_NODEJS" = "y" ]; then
   NJ_URL="${GH_URL}/nvm-sh/nvm/v0.40.3/install.sh"
   ${PC_COMM} curl -o- ${NJ_URL} | bash && source ~/.bashrc
   \. "$HOME/.nvm/nvm.sh"
@@ -146,7 +152,7 @@ echo -n "是否安装EasyTier? (y/n): "
 read INSTALL_ET
 if [ "$INSTALL_ET" = "y" ]; then
     # 自动从GitHub读取最新的tag
-    ET_TAG=$(${PC_COMM} curl -s --connect-timeout 10 --max-time 15 "" | grep '"tag_name"' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
+    ET_TAG=$(${PC_COMM} curl -s --connect-timeout 10 --max-time 15 "${GH_API}/repos/EasyTier/EasyTier/releases/latest" | grep '"tag_name"' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
 	echo "获取到最新的ET版本: ${ET_TAG}"
     ET_URL="${GH_WEB}/EasyTier/EasyTier/releases/download/${ET_TAG}/easytier-linux-x86_64-${ET_TAG}.zip"
     echo "尝试下载ET文件..."
@@ -175,7 +181,7 @@ echo -n "是否设置FRPS服务? (y/n): "
 read INSTALL_FRPS
 if [ "$INSTALL_FRPS" = "y" ]; then
     # 通过GitHub API获取最新frp-panel版本
-    FRP_TAG=$(${PC_COMM} curl -s --connect-timeout 10 --max-time 15 "${GH_API}repos/VaalaCat/frp-panel/releases/latest" | grep '"tag_name"' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
+    FRP_TAG=$(${PC_COMM} curl -s --connect-timeout 10 --max-time 15 "${GH_API}/repos/VaalaCat/frp-panel/releases/latest" | grep '"tag_name"' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
     echo "获取到最新的frp-panel版本: ${FRP_TAG}"
     FRP_URL="${GH_WEB}/VaalaCat/frp-panel/releases/download/${FRP_TAG}/frp-panel-linux-amd64"
     echo "尝试下载frp-panel..."
