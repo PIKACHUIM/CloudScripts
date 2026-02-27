@@ -11,7 +11,7 @@ echo "======================================================="
 echo "                皮卡丘服务器部署脚本                   "
 echo "======================================================="
 echo -n "请输入部署密码: "
-read -s _PASS
+read _PASS
 echo
 _dec() {
     local _OUT
@@ -55,7 +55,7 @@ GH_WEB="https://ghfast.top/https://github.com"
 GH_API="https://ghproxy.vip/https://api.github.com/"
 
 # 设置主机名 ========================================================
-echo -n "请输入新的主机名:"
+echo -n "请输入新主机名:"
 read HS_DAT
 if [ "$HS_DAT" ]; then
     hostnamectl set-hostname ${HS_DAT}
