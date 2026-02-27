@@ -64,8 +64,8 @@ fi
 
 
 # 系统初始安装 ======================================================
-apt update&& apt upgrade -y && apt install -y curl wget nano sudo vim
-
+apt update && apt upgrade -y && apt install -y curl wget nano sudo
+apt install -y unzip htop git openssl proxychains vim
 
 # 安装代理工具 ======================================================
 echo -n "使用ProxyChains4? (y/n): "
@@ -79,12 +79,16 @@ fi
 
 
 # 安装NodeJS24 ======================================================
-NJ_URL="${GH_URL}/nvm-sh/nvm/v0.40.3/install.sh"
-curl -o- ${NJ_URL} | bash && source ~/.bashrc
-\. "$HOME/.nvm/nvm.sh" && nvm install 24 && node -v && npm -v
-
-# 安装附加环境 ======================================================
-apt install -y unzip htop git openssl proxychains&&npm install pm2 -g
+echo -n "是否安装NODEJS24? (y/n): "
+read INSTALL_NODEJS
+if [ "INSTALL_NODEJS" = "y" ]; then
+  NJ_URL="${GH_URL}/nvm-sh/nvm/v0.40.3/install.sh"
+  curl -o- ${NJ_URL} | bash && source ~/.bashrc
+  \. "$HOME/.nvm/nvm.sh"
+  nvm install 24
+  node -v && npm -v
+  npm install pm2 -g
+fi
 
 # 安装宝塔面板 ======================================================
 echo -n "是否安装宝塔面板? (y/n): "
