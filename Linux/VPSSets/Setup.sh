@@ -83,9 +83,9 @@ echo -n "是否安装NODEJS24? (y/n): "
 read INSTALL_NODEJS
 if [ "INSTALL_NODEJS" = "y" ]; then
   NJ_URL="${GH_URL}/nvm-sh/nvm/v0.40.3/install.sh"
-  curl -o- ${NJ_URL} | bash && source ~/.bashrc
+  ${PC_COMM} curl -o- ${NJ_URL} | bash && source ~/.bashrc
   \. "$HOME/.nvm/nvm.sh"
-  nvm install 24
+  ${PC_COMM} nvm install 24
   node -v && npm -v
   npm install pm2 -g
 fi
