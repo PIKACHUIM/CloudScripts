@@ -50,8 +50,8 @@ FRP_RPC=$(_dec "$ENC_FRP_RPC")
 BT_PSA=$(_dec "$ENC_BT_PSA")
 BT_USER=$(_dec "$ENC_BT_USER")
 
-GH_URL="https://ghfast.top/https://raw.githubusercontent.com"
-GH_WEB="https://ghfast.top/https://github.com"
+GH_URL="https://ghproxy.vip/https://raw.githubusercontent.com"
+GH_WEB="https://ghproxy.vip/https://github.com"
 GH_API="https://ghproxy.vip/https://api.github.com"
 
 # 设置主机名 ========================================================
@@ -88,11 +88,18 @@ fi
 echo -n "是否安装NODEJS24? (y/N): "
 read INSTALL_NODEJS
 if [ "$INSTALL_NODEJS" = "y" ]; then
-  NJ_URL="${GH_URL}/nvm-sh/nvm/v0.40.3/install.sh"
-  ${PC_COMM} curl -o- ${NJ_URL} | ${PC_COMM} bash && source ~/.bashrc
-  \. "$HOME/.nvm/nvm.sh"
-  nvm install 24
+  #NJ_URL="${GH_URL}/nvm-sh/nvm/v0.40.3/install.sh"
+  #${PC_COMM} curl -o- ${NJ_URL} | ${PC_COMM} bash && source ~/.bashrc
+  #\. "$HOME/.nvm/nvm.sh"
+  #nvm install 24
+  git clone https://gitee.com/mirrors/nvm.git ~/.nvm && cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`
+  echo ". ~/.nvm/nvm.sh" >> ~/.bashrc
+  source ~/.bashrc
+  export NVM_NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node
+  nvm install --lts
+  nvm use --lts
   node -v && npm -v
+  npm config set registry https://registry.npmmirror.com
   npm install pm2 -g
 fi
 

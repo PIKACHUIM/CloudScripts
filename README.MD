@@ -7,9 +7,25 @@
 
 #### NAT VPS服务自动构建
 
+一键部署服务器环境的交互式脚本，敏感信息使用 AES-256-CBC 加密存储，运行时需输入部署密码。
+
 ```shell
 bash <(curl https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh)
 ```
+
+脚本包含以下可选模块（运行时按需选择）：
+
+| 模块 | 说明 |
+| --- | --- |
+| 系统初始化 | 更新系统、安装 curl/wget/nano/git/htop 等常用工具 |
+| ProxyChains4 | 配置 SOCKS5 代理链，用于后续下载加速 |
+| Node.js (LTS) | 通过 NVM 安装 Node.js LTS 版本，配置 npmmirror 源并安装 PM2 |
+| 宝塔面板 | 自动安装宝塔面板并配置用户名、密码和端口 |
+| 哪吒探针 | 安装哪吒监控 Agent 并自动注册到服务端 |
+| 3X-UI 面板 | 安装 3X-UI 面板，自动生成自签名 TLS 证书 |
+| EasyTier | 从 GitHub 获取最新版本，部署 EasyTier 组网服务（PM2 托管） |
+| FRP Panel | 安装 frp-panel 客户端/服务端节点（PM2 托管） |
+| 端口限速 | 使用 tc + IFB 对指定端口进行双向流量限速 |
 
 ### 服务器测评脚本
 
