@@ -61,7 +61,7 @@ do_bbrplus() {
 }
 
 do_kernel() {
-    echo -e "\n  $(t 'kernel.select'):"
+    printf '\n  %s:\n' "$(t 'kernel.select')"
     echo "  1) $(t 'kernel.xanmod')"
     echo "  2) $(t 'kernel.liquorix')"
     echo "  3) $(t 'kernel.backports') (Debian)"

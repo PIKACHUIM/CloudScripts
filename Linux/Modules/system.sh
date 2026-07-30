@@ -44,7 +44,7 @@ do_sys_ssh() {
 }
 
 do_sys_timezone() {
-    echo -e "\n  Common timezones:"
+    printf '\n  Common timezones:\n'
     echo "  1) Asia/Shanghai (UTC+8)"
     echo "  2) Asia/Tokyo (UTC+9)"
     echo "  3) America/New_York (UTC-5)"

@@ -254,7 +254,7 @@ main() {
         ui_section "$(t 'menu.main')"
         echo "  ${PIKA_CYAN}$(t 'app.os')${PIKA_NC}: ${PIKA_DISTRO} ${PIKA_DISTRO_VER}  |  $(t 'app.arch'): ${PIKA_ARCH_SHORT}  |  $(t 'app.mirror'): ${PIKA_MIRROR_BASE##*/}"
         if pika_is_container; then
-            echo -e "  ${PIKA_YELLOW}$(t 'app.container')${PIKA_NC}"
+            printf '  %s%s%s\n' "${PIKA_YELLOW}" "$(t 'app.container')" "${PIKA_NC}"
         fi
         echo ""
         ui_divider

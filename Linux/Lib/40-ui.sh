@@ -7,10 +7,10 @@
 set -e
 
 # ---- Color shortcuts (already defined in 00-core, re-export for convenience) ----
-: "${PIKA_RED:=\\033[0;31m}"; : "${PIKA_GREEN:=\\033[0;32m}"
-: "${PIKA_YELLOW:=\\033[1;33m}"; : "${PIKA_BLUE:=\\033[0;34m}"
-: "${PIKA_CYAN:=\\033[0;36m}"; : "${PIKA_MAGENTA:=\\033[0;35m}"
-: "${PIKA_BOLD:=\\033[1m}"; : "${PIKA_NC:=\\033[0m}"
+: "${PIKA_RED:=$(printf '\033[0;31m')}"; : "${PIKA_GREEN:=$(printf '\033[0;32m')}"
+: "${PIKA_YELLOW:=$(printf '\033[1;33m')}"; : "${PIKA_BLUE:=$(printf '\033[0;34m')}"
+: "${PIKA_CYAN:=$(printf '\033[0;36m')}"; : "${PIKA_MAGENTA:=$(printf '\033[0;35m')}"
+: "${PIKA_BOLD:=$(printf '\033[1m')}"; : "${PIKA_NC:=$(printf '\033[0m')}"
 
 # ---- Terminal width ----
 _pika_term_width() {
@@ -27,22 +27,23 @@ ui_header() {
     local ver_full="${PIKA_VERSION_FULL:-${PIKA_VERSION:-0.0}}"
     local ver_pad; ver_pad=$(( w - 9 - ${#ver_full} - 1 ))
     [ "$ver_pad" -lt 1 ] && ver_pad=1
-    echo -e "${PIKA_CYAN}"
-    echo "  ╔${_line}╗"
-    echo "  ║  ${PIKA_BOLD}$(t 'app.name')${PIKA_NC}${PIKA_CYAN}$(printf '%*s' "$ver_pad" '')v${ver_full}  ║"
-    echo "  ╚${_line}╝"
-    echo -e "${PIKA_NC}"
+    printf '%s\n' "${PIKA_CYAN}"
+    printf '  ╔%s╗\n' "$_line"
+    printf '  ║  %s%s%s%s%sv%s  ║\n' \
+        "${PIKA_BOLD}" "$(t 'app.name')" "${PIKA_NC}" "${PIKA_CYAN}" "$(printf '%*s' "$ver_pad" '')" "$ver_full"
+    printf '  ╚%s╝\n' "$_line"
+    printf '%s' "${PIKA_NC}"
 }
 
 # ---- Print section title ----
 ui_section() {
-    echo -e "\n  ${PIKA_YELLOW}${PIKA_BOLD}▸ $1${PIKA_NC}"
+    printf '\n  %s%s▸ %s%s\n' "${PIKA_YELLOW}" "${PIKA_BOLD}" "$1" "${PIKA_NC}"
 }
 
 # ---- Print divider ----
 ui_divider() {
     local _line; _line=$(_ui_repeat_char '─' $(($(_pika_term_width)-4)))
-    echo -e "  ${PIKA_CYAN}${_line}${PIKA_NC}"
+    printf '  %s%s%s\n' "${PIKA_CYAN}" "$_line" "${PIKA_NC}"
 }
 
 # ---- Repeat a single character N times (no external deps) ----
@@ -164,21 +165,21 @@ ui_confirm_install() {
     local name="$1" desc="$2" version="${3:-}" url="${4:-}"
 
     local _hdr; _hdr=$(_ui_repeat_char '─' $(($(_pika_term_width)-6)))
-    echo ""
-    echo -e "  ${PIKA_CYAN}┌${_hdr}┐${PIKA_NC}"
+    printf '\n'
+    printf '  %s┌%s┐%s\n' "${PIKA_CYAN}" "$_hdr" "${PIKA_NC}"
     printf "  ${PIKA_CYAN}│${PIKA_NC} ${PIKA_BOLD}$(t 'ui.install')${PIKA_NC}: %-$(($(_pika_term_width)-17))s ${PIKA_CYAN}│${PIKA_NC}\n" "$name"
-    echo -e "  ${PIKA_CYAN}├${_hdr}┤${PIKA_NC}"
+    printf '  %s├%s┤%s\n' "${PIKA_CYAN}" "$_hdr" "${PIKA_NC}"
     printf "  ${PIKA_CYAN}│${PIKA_NC} %-$(($(_pika_term_width)-8))s ${PIKA_CYAN}│${PIKA_NC}\n" "  $desc"
     [ -n "$version" ] && printf "  ${PIKA_CYAN}│${PIKA_NC} $(t 'ui.version'): %-$(($(_pika_term_width)-18))s ${PIKA_CYAN}│${PIKA_NC}\n" "$version"
     [ -n "$url" ] && printf "  ${PIKA_CYAN}│${PIKA_NC} %-$(($(_pika_term_width)-8))s ${PIKA_CYAN}│${PIKA_NC}\n" "  $url"
-    echo -e "  ${PIKA_CYAN}└${_hdr}┘${PIKA_NC}"
+    printf '  %s└%s┘%s\n' "${PIKA_CYAN}" "$_hdr" "${PIKA_NC}"
 
     pika_confirm "$(t 'ui.confirm')"
 }
 
 # ---- Print tip ----
 ui_tip() {
-    echo -e "  ${PIKA_MAGENTA}💡 $*${PIKA_NC}"
+    printf '  %s💡 %s%s\n' "${PIKA_MAGENTA}" "$*" "${PIKA_NC}"
 }
 
 # ---- Mark lib as loaded ----
