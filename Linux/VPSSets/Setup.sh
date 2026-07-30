@@ -70,7 +70,7 @@ get_latest_github_tag() {
     local RAW
 
     # 方法1: 直连GitHub API（最可靠）
-    echo "  [方法1] 直连GitHub API获取版本..."
+    echo "  [方法1] 直连GitHub API获取版本..." >&2
     RAW=$(curl -s --connect-timeout 10 --max-time 15 \
         "${GH_API_DIRECT}/repos/${REPO}/releases/latest" 2>/dev/null)
     TAG=$(echo "$RAW" | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' | head -1)
@@ -80,7 +80,7 @@ get_latest_github_tag() {
     fi
 
     # 方法2: 通过代理访问GitHub API
-    echo "  [方法2] 代理访问GitHub API获取版本..."
+    echo "  [方法2] 代理访问GitHub API获取版本..." >&2
     RAW=$(${PC_COMM} curl -s --connect-timeout 10 --max-time 15 \
         "${GH_API}/repos/${REPO}/releases/latest" 2>/dev/null)
     TAG=$(echo "$RAW" | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' | head -1)
@@ -90,7 +90,7 @@ get_latest_github_tag() {
     fi
 
     # 方法3: 从GitHub releases/latest重定向地址解析版本
-    echo "  [方法3] 解析重定向地址获取版本..."
+    echo "  [方法3] 解析重定向地址获取版本..." >&2
     local REDIR_URL
     REDIR_URL=$(curl -sI --connect-timeout 10 --max-time 15 \
         "https://github.com/${REPO}/releases/latest" 2>/dev/null \
@@ -103,7 +103,7 @@ get_latest_github_tag() {
     fi
 
     # 方法4: 通过代理页面解析
-    echo "  [方法4] 通过代理页面解析版本..."
+    echo "  [方法4] 通过代理页面解析版本..." >&2
     REDIR_URL=$(curl -sI --connect-timeout 10 --max-time 15 \
         "${GH_WEB}/${REPO}/releases/latest" 2>/dev/null \
         | grep -i "^location:" | sed 's/.*\///' | tr -d '\r' | tr -d '\n')
@@ -114,7 +114,7 @@ get_latest_github_tag() {
     fi
 
     # 方法5: 使用ghproxy API间接获取
-    echo "  [方法5] 备用代理API获取版本..."
+    echo "  [方法5] 备用代理API获取版本..." >&2
     RAW=$(curl -s --connect-timeout 10 --max-time 15 \
         "https://ghproxy.vip/${GH_API_DIRECT}/repos/${REPO}/releases/latest" 2>/dev/null)
     TAG=$(echo "$RAW" | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' | head -1)
