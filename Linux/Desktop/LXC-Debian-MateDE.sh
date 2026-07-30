@@ -1,32 +1,50 @@
 #!/bin/bash
+# MATE Desktop Environment (保留原有脚本，RDDocker 未提供 MATE 版本)
+
+set -e
+INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$INSTALL_DIR/commons.sh"
+
 # Check -----------------------------------------------------------
 file="/etc/lxc-de-flag"
-set -e
 if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
     apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
-	apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
+    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
 else
-    read -r content < "$file"      # 去掉前后空白，只读第一行
+    read -r content < "$file"
     case "$content" in
         0) apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e ;;
-        9) echo "检查通过，开始安装桌面....." ;;
+        9) echo "检查通过，开始安装 MATE 桌面....." ;;
         *) echo "已经安装过桌面，禁止重复安装" && exit ;;
     esac
 fi
 
-# GNOME3 ------------------------------------------------------
-DEBIAN_FRONTEND=noninteractive apt install task-mate-desktop  \
-mate-desktop-environment-extras
+# MATE Desktop -----------------------------------------------------
+case "$OS_ID" in
+    debian|ubuntu)
+        eval "$PKG_INSTALL task-mate-desktop mate-desktop-environment-extras"
+        ;;
+    fedora)
+        eval "$PKG_INSTALL @mate-desktop mate-applications"
+        ;;
+    arch|archos)
+        eval "$PKG_UPDATE"
+        eval "$PKG_INSTALL mate mate-extra"
+        ;;
+    alpine)
+        eval "$PKG_UPDATE"
+        eval "$PKG_INSTALL mate-desktop mate-desktop-environment"
+        ;;
+esac
 
-
-# X11RDP ------------------------------------------------------ 
-update-alternatives --set x-session-manager /usr/bin/mate-session
-
-# Startup Desktop ---------------------------------------------
-echo 'echo Starting DockerClouds Platform -----'  >> /run.sh
-echo 'systemctl start dockerclouds 2>/dev/null || /usr/bin/python3 /opt/dockerclouds/Server.py &' >> /run.sh
-echo 'echo Starting Desktop Runtime -----------' >> /run.sh
-echo 'export DISPLAY=:9 &&export $(dbus-launch)' >> /run.sh
-echo 'nohup Xvfb :9 -ac -screen 0 1600x900x24 &' >> /run.sh
-echo 'nohup /usr/bin/mate-session &            ' >> /run.sh
+# Startup Desktop --------------------------------------------------
+cat >> /run.sh <<'EOF'
+echo "Starting MATE Desktop..."
+export DISPLAY=:9
+nohup Xvfb :9 -ac -screen 0 1920x1080x24 &
+sleep 1
+eval $(dbus-launch --sh-syntax)
+bash /x11vnc.sh
+DISPLAY=:9 nohup mate-session &
+EOF
 echo 7 > /etc/lxc-de-flag

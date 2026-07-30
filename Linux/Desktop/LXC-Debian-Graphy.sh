@@ -51,8 +51,6 @@ EOF
 chmod +x /x11vnc.sh
 
 # Start Setup -----------------------------------------------------
-echo 'echo Starting DockerClouds Platform -----'  >> /run.sh
-echo 'systemctl start dockerclouds 2>/dev/null || /usr/bin/python3 /opt/dockerclouds/Server.py &' >> /run.sh
 echo 'echo Starting Graph Runtime -----------'  >> /run.sh
 echo 'export DISPLAY=:9'                        >> /run.sh
 echo '/etc/init.d/dbus start'                   >> /run.sh
