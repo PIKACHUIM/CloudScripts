@@ -2,9 +2,19 @@
 # ============================================================
 #  PIKA SH - I18n / Localization
 #  Auto-detect locale, load language pack, t() translation function
-#  Requires: 00-core.sh loaded first
+#  Requires: 00-core.sh loaded first, bash 4.0+
 # ============================================================
 set -e
+
+# ---- Require bash 4.0+ for associative arrays ----
+if [ -z "${BASH_VERSION:-}" ]; then
+    echo "ERROR: This script requires bash 4.0+. Please run: bash Menu.sh" >&2
+    exit 1
+fi
+if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ]; then
+    echo "ERROR: Bash 4.0+ required (current: $BASH_VERSION). Please upgrade bash." >&2
+    exit 1
+fi
 
 # ---- Language detection order ----
 # PIKA_LANG env > /etc/pika-sh/config > LC_ALL > LC_MESSAGES > LANG > fallback (zh_CN)

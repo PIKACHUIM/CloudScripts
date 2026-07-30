@@ -23,10 +23,14 @@ ui_clear() { clear 2>/dev/null || printf '\033[2J\033[H'; }
 # ---- Print header banner ----
 ui_header() {
     local w; w=$(_pika_term_width)
+    local _line; _line=$(_ui_repeat_char '═' $((w-4)))
+    local ver_full="${PIKA_VERSION_FULL:-${PIKA_VERSION:-0.0}}"
+    local ver_pad; ver_pad=$(( w - 9 - ${#ver_full} - 1 ))
+    [ "$ver_pad" -lt 1 ] && ver_pad=1
     echo -e "${PIKA_CYAN}"
-    echo "  ╔$(printf '═%.0s' $(seq 1 $((w-4))))╗"
-    echo "  ║  ${PIKA_BOLD}$(t 'app.name')${PIKA_NC}${PIKA_CYAN}$(printf '%*s' $((w-9-${#PIKA_VERSION_FULL:-3})) '')v${PIKA_VERSION:-0.0}  ║"
-    echo "  ╚$(printf '═%.0s' $(seq 1 $((w-4))))╝"
+    echo "  ╔${_line}╗"
+    echo "  ║  ${PIKA_BOLD}$(t 'app.name')${PIKA_NC}${PIKA_CYAN}$(printf '%*s' "$ver_pad" '')v${ver_full}  ║"
+    echo "  ╚${_line}╝"
     echo -e "${PIKA_NC}"
 }
 
@@ -37,7 +41,21 @@ ui_section() {
 
 # ---- Print divider ----
 ui_divider() {
-    echo -e "  ${PIKA_CYAN}$(printf '─%.0s' $(seq 1 $(($(_pika_term_width)-4))))${PIKA_NC}"
+    local _line; _line=$(_ui_repeat_char '─' $(($(_pika_term_width)-4)))
+    echo -e "  ${PIKA_CYAN}${_line}${PIKA_NC}"
+}
+
+# ---- Repeat a single character N times (no external deps) ----
+_ui_repeat_char() {
+    local char="$1" count="$2"
+    [ "$count" -le 0 ] 2>/dev/null && return
+    local s=""
+    local i=0
+    while [ $i -lt "$count" ]; do
+        s="${s}${char}"
+        i=$((i+1))
+    done
+    echo "$s"
 }
 
 # ---- Print a menu item: [number] name ........ description ----
@@ -66,15 +84,15 @@ _ui_str_width() {
     fi
 
     # Pure bash fallback: count bytes in multi-byte ranges as 2-wide
-    local w=0 c
-    local i=0 len=${#s}
+    local w=0 c i=0 len=${#s}
     while [ $i -lt $len ]; do
         c="${s:$i:1}"
-        # CJK ranges (simplified): U+2E80-U+2EFF CJK radicals
-        # U+3000-U+303F CJK symbols, U+FF00-U+FFEF halfwidth/fullwidth
-        # U+4E00-U+9FFF CJK unified, U+F900-U+FAFF CJK compat
-        # This is a rough approximation in pure bash
-        local byte; byte=$(printf '%d' "'$c" 2>/dev/null || echo 0)
+        local byte
+        byte=$(printf '%d' "'$c" 2>/dev/null || echo "0")
+        # Ensure byte is numeric before arithmetic comparison
+        case "$byte" in
+            ''|*[!0-9]*) byte=0 ;;
+        esac
         if [ "$byte" -ge 19968 ] 2>/dev/null; then w=$((w+2))  # U+4E00+
         elif [ "$byte" -ge 12288 ] 2>/dev/null && [ "$byte" -le 12543 ] 2>/dev/null; then w=$((w+2))
         elif [ "$byte" -ge 65072 ] 2>/dev/null && [ "$byte" -le 65119 ] 2>/dev/null; then w=$((w+2))
@@ -145,14 +163,15 @@ ui_dispatch() {
 ui_confirm_install() {
     local name="$1" desc="$2" version="${3:-}" url="${4:-}"
 
+    local _hdr; _hdr=$(_ui_repeat_char '─' $(($(_pika_term_width)-6)))
     echo ""
-    echo -e "  ${PIKA_CYAN}┌$(printf '─%.0s' $(seq 1 $(($(_pika_term_width)-6))))┐${PIKA_NC}"
+    echo -e "  ${PIKA_CYAN}┌${_hdr}┐${PIKA_NC}"
     printf "  ${PIKA_CYAN}│${PIKA_NC} ${PIKA_BOLD}$(t 'ui.install')${PIKA_NC}: %-$(($(_pika_term_width)-17))s ${PIKA_CYAN}│${PIKA_NC}\n" "$name"
-    echo -e "  ${PIKA_CYAN}├$(printf '─%.0s' $(seq 1 $(($(_pika_term_width)-6))))┤${PIKA_NC}"
+    echo -e "  ${PIKA_CYAN}├${_hdr}┤${PIKA_NC}"
     printf "  ${PIKA_CYAN}│${PIKA_NC} %-$(($(_pika_term_width)-8))s ${PIKA_CYAN}│${PIKA_NC}\n" "  $desc"
     [ -n "$version" ] && printf "  ${PIKA_CYAN}│${PIKA_NC} $(t 'ui.version'): %-$(($(_pika_term_width)-18))s ${PIKA_CYAN}│${PIKA_NC}\n" "$version"
     [ -n "$url" ] && printf "  ${PIKA_CYAN}│${PIKA_NC} %-$(($(_pika_term_width)-8))s ${PIKA_CYAN}│${PIKA_NC}\n" "  $url"
-    echo -e "  ${PIKA_CYAN}└$(printf '─%.0s' $(seq 1 $(($(_pika_term_width)-6))))┘${PIKA_NC}"
+    echo -e "  ${PIKA_CYAN}└${_hdr}┘${PIKA_NC}"
 
     pika_confirm "$(t 'ui.confirm')"
 }

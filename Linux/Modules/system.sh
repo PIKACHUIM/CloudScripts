@@ -8,6 +8,7 @@ set -e
 SystemMENU=(
     "ssh|system.ssh|system.ssh.desc|do_sys_ssh"
     "timezone|system.timezone|system.timezone.desc|do_sys_timezone"
+    "hostname|system.hostname|system.hostname.desc|do_sys_hostname"
     "info|system.info|system.info.desc|do_sys_info"
     "update|system.update|system.update.desc|do_sys_update"
     "shortcut|system.shortcut|system.shortcut.desc|do_sys_shortcut"
@@ -67,6 +68,54 @@ do_sys_timezone() {
     # Sync NTP
     ntpdate -u pool.ntp.org 2>/dev/null || timedatectl set-ntp true 2>/dev/null || true
     pika_info "$(t 'common.done') - $(date)"
+}
+
+do_sys_hostname() {
+    local current; current=$(hostname)
+    echo ""
+    echo "  $(t 'system.hostname.current'): $current"
+    echo ""
+
+    # Show current hostname entry in /etc/hosts
+    echo "  $(t 'system.hostname.hosts_entries'):"
+    grep -n -E "(^|[[:space:]])${current}([[:space:]]|$)" /etc/hosts 2>/dev/null | sed 's/^/    /' || echo "    (none)"
+    echo ""
+
+    local new_name
+    read -r -p "  $(t 'system.hostname.new_prompt'): " new_name
+    [ -z "$new_name" ] && { pika_info "$(t 'ui.cancelled')"; return; }
+
+    # Validate: RFC 952/1123 hostname rules
+    if ! echo "$new_name" | grep -qE '^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$'; then
+        pika_error "$(t 'system.hostname.invalid')"
+        return
+    fi
+
+    # Set hostname (prefer hostnamectl for systemd, fallback to hostname command)
+    if command -v hostnamectl >/dev/null 2>&1; then
+        hostnamectl set-hostname "$new_name"
+    else
+        echo "$new_name" > /etc/hostname
+        hostname "$new_name" 2>/dev/null || true
+    fi
+
+    # Update /etc/hosts: replace old hostname entries, add 127.0.1.1 entry
+    if [ -n "$current" ] && [ "$current" != "$new_name" ]; then
+        sed -i "s/^\([[:space:]]*[0-9.]*[[:space:]]*\)${current}\([[:space:]].*\|$\)/\1${new_name}\2/" /etc/hosts 2>/dev/null || true
+    fi
+    # Ensure 127.0.1.1 entry exists
+    if ! grep -qE "^[[:space:]]*127\.0\.1\.1[[:space:]]+${new_name}" /etc/hosts 2>/dev/null; then
+        echo "127.0.1.1       ${new_name}" >> /etc/hosts
+    fi
+
+    # Update cloud-init preserve_hostname if applicable
+    if [ -f /etc/cloud/cloud.cfg ]; then
+        if grep -q 'preserve_hostname' /etc/cloud/cloud.cfg 2>/dev/null; then
+            sed -i 's/^preserve_hostname:.*/preserve_hostname: true/' /etc/cloud/cloud.cfg
+        fi
+    fi
+
+    pika_info "$(t 'system.hostname.success') $new_name"
 }
 
 do_sys_info() {

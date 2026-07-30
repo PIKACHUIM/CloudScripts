@@ -10,6 +10,16 @@
 # ============================================================
 set -e
 
+# ---- Require bash 4.0+ (associative arrays are essential for i18n) ----
+if [ -z "${BASH_VERSION:-}" ]; then
+    echo "ERROR: This script requires bash 4.0+. Please run: bash Menu.sh" >&2
+    exit 1
+fi
+if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ]; then
+    echo "ERROR: Bash 4.0+ required (current: $BASH_VERSION). Please upgrade bash." >&2
+    exit 1
+fi
+
 PIKA_VERSION="1.0"
 PIKA_BASE="$(cd "$(dirname "$0")" && pwd)"
 PIKA_LIB_DIR="${PIKA_BASE}/Linux/Lib"
