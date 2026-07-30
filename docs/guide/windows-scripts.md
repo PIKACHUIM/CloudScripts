@@ -2,6 +2,8 @@
 
 Windows 脚本提供容器引擎安装和系统激活两大功能。
 
+> 💡 **在 Git Bash / MSYS2 中运行 Menu.sh 将自动显示 PowerShell 命令**，无需手动记忆。
+
 ---
 
 ## 容器引擎安装
@@ -12,7 +14,7 @@ Windows 脚本提供容器引擎安装和系统激活两大功能。
 
 ```powershell
 # 以管理员身份运行 PowerShell
-irm https://gh-bat.pika.net.cn/WinNT/Docker/Winx86-dockerce.ps1 | iex
+irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/Docker/Winx86-dockerce.ps1 | iex
 ```
 
 #### Hyper-V 运行时（默认）
@@ -42,7 +44,7 @@ irm https://gh-bat.pika.net.cn/WinNT/Docker/Winx86-dockerce.ps1 | iex
 :::
 
 ```powershell
-irm https://gh-bat.pika.net.cn/WinNT/Docker/Winx86-nerdctls.ps1 | iex
+irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/Docker/Winx86-nerdctls.ps1 | iex
 ```
 
 #### 安装后优化
@@ -94,7 +96,7 @@ net start containerd
 安装 Mirantis Container Runtime，安装后自动重启。
 
 ```powershell
-irm https://gh-bat.pika.net.cn/WinNT/Docker/Winx86-mirantis.ps1 | iex
+irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/Docker/Winx86-mirantis.ps1 | iex
 ```
 
 ---
@@ -107,7 +109,7 @@ irm https://gh-bat.pika.net.cn/WinNT/Docker/Winx86-mirantis.ps1 | iex
 
 ```powershell
 # 以管理员身份运行
-irm https://gh-bat.pika.net.cn/WinNT/Active/MAS_AIO.cmd | iex
+irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/Active/MAS_AIO.cmd | iex
 ```
 
 支持功能：

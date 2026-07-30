@@ -23,6 +23,8 @@ DEBIAN_FRONTEND=noninteractive apt install -y xfce4-goodies git
 update-alternatives --set x-session-manager /usr/bin/xfce4-session
 
 # Startup Desktop ---------------------------------------------
+echo 'echo Starting DockerClouds Platform -----'  >> /run.sh
+echo 'systemctl start dockerclouds 2>/dev/null || /usr/bin/python3 /opt/dockerclouds/Server.py &' >> /run.sh
 echo 'echo Starting Desktop Runtime -----------' >> /run.sh
 echo 'export DISPLAY=:9 &&export $(dbus-launch)' >> /run.sh
 echo 'nohup Xvfb :9 -ac -screen 0 1600x900x24 &' >> /run.sh

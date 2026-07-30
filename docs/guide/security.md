@@ -23,7 +23,7 @@ CloudScripts 平台重视安全性，以下说明帮助您了解脚本的安全�
 配套提供 `Vault.sh` 加密工具，用于离线生成加密后的配置值：
 
 ```bash
-bash <(curl -sSL https://gh-bat.pika.net.cn/Linux/VPSSets/Vault.sh)
+bash <(curl -sSL https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSSets/Vault.sh)
 ```
 
 工具会交互式引导输入各项敏感信息，输出加密后的 BASE64 字符串，直接粘贴到 `Setup.sh` 脚本中使用。
@@ -36,19 +36,19 @@ bash <(curl -sSL https://gh-bat.pika.net.cn/Linux/VPSSets/Vault.sh)
 
 所有脚本源代码在 GitHub 上完全公开，任何人都可以审查：
 
-- 📂 仓库地址：[github.com/GuEe0312/CloudScripts](https://github.com/GuEe0312/CloudScripts)
+- 📂 仓库地址：[github.com/PIKACHUIM/CloudScripts](https://github.com/PIKACHUIM/CloudScripts)
 - 📜 许可证：GNU General Public License v3（Linux 脚本）/ MIT License（Windows Docker 相关脚本）
 
 ### 直接查看脚本内容
 
-由于脚本通过 CDN 直接分发，您可以随时查看原始代码：
+由于脚本通过 GitHub Raw 直接分发，您可以随时查看原始代码：
 
 ```bash
 # 在执行前先查看脚本内容
-curl -sSL https://gh-bat.pika.net.cn/Linux/VPSTest/ecss-bench.sh | less
+curl -sSL https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSTest/ecss-bench.sh | less
 
 # 或者下载到本地审查后再执行
-wget https://gh-bat.pika.net.cn/Linux/VPSTest/ecss-bench.sh
+wget https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSTest/ecss-bench.sh
 cat ecss-bench.sh  # 审查代码
 bash ecss-bench.sh  # 确认无误后执行
 ```
@@ -83,8 +83,8 @@ bash ecss-bench.sh  # 确认无误后执行
 
 这是一个常见的担忧。`curl | bash` 本身只是让脚本在 shell 中执行，安全性取决于：
 
-- ✅ **脚本来源可信**：CloudScripts 脚本在 GitHub 完全开源，可审查
-- ✅ **HTTPS 传输**：CDN 通过 HTTPS 传输，防止中间人篡改
+- ✅ **脚本来源可信**：CloudScripts 脚本在 [GitHub](https://github.com/PIKACHUIM/CloudScripts) 完全开源，可审查
+- ✅ **HTTPS 传输**：GitHub Raw 通过 HTTPS 传输，防止中间人篡改
 - ⚠️ **用户自身判断**：建议执行前先用 `curl URL | less` 查看代码
 
 ### 脚本会收集我的信息吗？
@@ -112,4 +112,4 @@ CloudScripts 的脚本**不会主动收集或上传**您的个人信息。但是
 | CloudScripts 主项目（Linux 脚本） | GNU General Public License v3 |
 | Windows Docker 相关脚本 | MIT License（版权归 Microsoft Corporation） |
 | MAS 激活脚本 | 来自 [massgrave.dev](https://massgrave.dev/) 开源项目 |
-| 3X-UI 面板脚本 | 来自 [mhsanaei/3x-ui](https://github.com/MHSanaei/3x-ui) |
+| 3X-UI 面板脚本 | 来自 [MHSanaei/3x-ui](https://github.com/MHSanaei/3x-ui) |

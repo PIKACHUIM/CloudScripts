@@ -2,20 +2,46 @@
 
 本指南将帮助你快速上手使用 CloudScripts 脚本平台。
 
+## 推荐方式：一键总菜单
+
+CloudScripts 提供了统一的 `Menu.sh` 总菜单脚本，**自动识别系统类型**并展示对应功能。你只需要：
+
+```bash
+bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
+```
+
+> 🌐 **国内加速**（下载更快）：
+> ```bash
+> bash <(curl -s https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
+> ```
+
+启动后你会看到分类清晰的菜单，输入编号即可执行对应脚本：
+
+| 类别 | 编号 | 功能 |
+|:-----|:----:|:-----|
+| 🖥️ 服务器部署 | 1-4 | VPS 一键部署、系统清理、3X-UI 面板、端口限速 |
+| 🎨 桌面环境 | 10-17 | Debian LXC 容器 8 种桌面一键安装 |
+| 📊 性能测评 | 20-27 | 融合怪/IP质量/LemonBench/YABS/UnixBench 等 |
+| 🌐 网络诊断 | 30-34 | 回程路由/全国Ping/Speedtest 等 |
+| 🪟 Windows | 1-10 | Docker CE / Mirantis / nerdctl / MAS 激活 |
+
+> 也支持直接传参：`bash Menu.sh 20` 直接运行融合怪测评。
+
 ## 基本用法
 
-CloudScripts 的所有脚本都通过 CDN 托管，你需要做的只是**复制命令，粘贴到终端执行**。
+如果你只需要执行单个脚本，也可以直接用 `curl` / `wget` 一行命令：
 
 ### Linux 执行方式
 
-在 Linux 终端中，使用 `bash` 配合 `curl` 或 `wget` 执行脚本：
-
 ```bash
 # 使用 curl
-bash <(curl -sSL https://gh-bat.pika.net.cn/脚本路径)
+bash <(curl -sSL https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/脚本路径)
 
 # 使用 wget
-bash <(wget -qO- https://gh-bat.pika.net.cn/脚本路径)
+bash <(wget -qO- https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/脚本路径)
+
+# 国内加速（将 raw.githubusercontent.com 替换为镜像前缀）
+bash <(curl -sSL https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/脚本路径)
 ```
 
 ### Windows 执行方式
@@ -23,7 +49,7 @@ bash <(wget -qO- https://gh-bat.pika.net.cn/脚本路径)
 在 **PowerShell（管理员模式）** 中执行：
 
 ```powershell
-irm https://gh-bat.pika.net.cn/WinNT/脚本路径 | iex
+irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/脚本路径 | iex
 ```
 
 ## 前置要求
@@ -32,7 +58,7 @@ irm https://gh-bat.pika.net.cn/WinNT/脚本路径 | iex
 
 - **操作系统**：Debian 9+ / Ubuntu 18.04+ / CentOS 7+ / Rocky Linux / AlmaLinux
 - **权限**：建议使用 `root` 用户或具有 `sudo` 权限的用户
-- **网络**：能够访问外网（脚本托管在 CDN 上）
+- **网络**：能够访问外网（脚本托管在 GitHub Raw 上）
 - **依赖**：系统需预装 `curl` 或 `wget`（绝大多数发行版默认包含）
 
 ### Windows 环境
@@ -46,21 +72,21 @@ irm https://gh-bat.pika.net.cn/WinNT/脚本路径 | iex
 
 ### 示例 1：VPS 到手即测
 
-拿到一台新 VPS 后，运行综合测评脚本：
+拿到一台新 VPS 后，运行 Menu.sh 选 `20` 即可开始综合测评：
 
 ```bash
-# 融合怪综合测评（最全面的一体化测试）
-bash <(wget -qO- https://gh-bat.pika.net.cn/Linux/VPSTest/ecss-bench.sh)
+# 方式一：通过总菜单
+bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
 
-# 或者使用秋水逸冰的 Bench.sh（简单快速）
-bash <(wget -qO- https://gh-bat.pika.net.cn/Linux/VPSTest/qsyb-bench.sh)
+# 方式二：直接执行
+bash <(wget -qO- https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSTest/ecss-bench.sh)
 ```
 
 ### 示例 2：一键部署代理和面板
 
 ```bash
 # 运行交互式部署脚本，按需选择要安装的模块
-bash <(curl -sSL https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh)
+bash <(curl -sSL https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSSets/Setup.sh)
 ```
 
 脚本提供以下可选模块（安装时可自由勾选）：
@@ -75,24 +101,27 @@ bash <(curl -sSL https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh)
 | 3X-UI 面板 | 安装 Xray-core 管理面板 |
 | EasyTier | 部署组网服务 |
 | FRP Panel | 安装 frp 内网穿透面板 |
-| 端口限速 | 使用 tc + IFB 进行流量控制 |
+| RustDesk 中转 | 部署 RustDesk 中继服务 |
+| ZeroTier | 安装 ZeroTier 组网 |
+| Tailscale | 安装 Tailscale 组网 |
+| 端口限速 | 使用 tc + IFB 进行流量控制（支持自定义端口和速率） |
 
 ### 示例 3：LXC 容器安装桌面
 
 ```bash
 # 1. 先安装基础环境和图形栈
-curl -sSL https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
-curl -sSL https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
+curl -sSL https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Desktop/LXC-Debian-Server.sh | bash -e
+curl -sSL https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
 
 # 2. 选择一个桌面环境安装（以 Xfce 轻量桌面为例）
-curl -sSL https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Xfce4L.sh | bash -e
+curl -sSL https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Desktop/LXC-Debian-Xfce4L.sh | bash -e
 ```
 
 ### 示例 4：Windows 安装 Docker
 
 ```powershell
 # 以管理员身份运行 PowerShell
-irm https://gh-bat.pika.net.cn/WinNT/Docker/Winx86-dockerce.ps1 | iex
+irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/Docker/Winx86-dockerce.ps1 | iex
 ```
 
 ## 注意事项
