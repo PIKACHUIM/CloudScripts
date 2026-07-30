@@ -39,9 +39,10 @@ t() {
     local varname="T_${key//./_}"
     local msg="${!varname}"
     if [ $# -gt 0 ]; then
+        # shellcheck disable=SC2059
         printf "${msg:-$key}" "$@"
     else
-        echo -n "${msg:-$key}"
+        printf '%s' "${msg:-$key}"
     fi
 }
 

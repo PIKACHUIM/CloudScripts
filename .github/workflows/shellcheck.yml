@@ -22,7 +22,7 @@ jobs:
         with:
           scandir: '.'
           format: tty
-          severity: error
+          severity: warning
           ignore_paths: |
             Linux/VPSTest/ecss-bench/*
             Linux/VPSTest/yabs-bench/*
@@ -39,17 +39,50 @@ jobs:
 
       - name: Verify i18n key consistency
         run: |
-          echo "Checking i18n key consistency..."
-          zh_keys=$(grep -oP 'T\["[^"]+"\]' Linux/I18n/zh_CN.sh | sort -u)
-          en_keys=$(grep -oP 'T\["[^"]+"\]' Linux/I18n/en_US.sh | sort -u)
+          echo "=== Checking i18n key consistency ==="
+          # Extract keys from flat variable format: T_key_name="value"
+          zh_keys=$(grep -oP '^T_[a-zA-Z0-9_]+(?==)' Linux/I18n/zh_CN.sh | sort -u)
+          en_keys=$(grep -oP '^T_[a-zA-Z0-9_]+(?==)' Linux/I18n/en_US.sh | sort -u)
 
           # en_US should be a subset of zh_CN (zh_CN is the fallback)
           extra_in_en=$(comm -23 <(echo "$en_keys") <(echo "$zh_keys") || true)
           if [ -n "$extra_in_en" ]; then
-            echo "WARNING: Keys in en_US but not in zh_CN (no fallback!):"
+            echo "::warning::Keys in en_US but not in zh_CN (no fallback!):"
             echo "$extra_in_en"
+          fi
+
+          # Find keys referenced via t() calls but missing from zh_CN
+          echo "=== Checking t() call coverage ==="
+          used_keys=$(grep -roP "\bt\s+'([^']+)'" Linux/Lib/ Linux/Modules/ Menu.sh 2>/dev/null | \
+            grep -oP "'\K[^']+(?=')" | sort -u)
+          missing_keys=""
+          for key in $used_keys; do
+            varname="T_${key//./_}"
+            if ! grep -q "^${varname}=" Linux/I18n/zh_CN.sh 2>/dev/null; then
+              missing_keys="$missing_keys  $key ($varname)\n"
+            fi
+          done
+          if [ -n "$missing_keys" ]; then
+            echo "::warning::Keys used in t() but missing from zh_CN.sh:"
+            printf '%b' "$missing_keys"
           fi
 
           echo "zh_CN keys: $(echo "$zh_keys" | wc -l)"
           echo "en_US keys: $(echo "$en_keys" | wc -l)"
+          echo "Keys used in code: $(echo "$used_keys" | wc -l)"
           echo "i18n check complete."
+
+      - name: Check critical patterns
+        run: |
+          echo "=== Checking for common anti-patterns ==="
+          # SC2154: undefined variable references (use pika_err not pika_error)
+          if grep -rn 'pika_error\b' Linux/Lib/ Linux/Modules/ Menu.sh --include='*.sh' 2>/dev/null; then
+            echo "::error::Found 'pika_error' calls - should be 'pika_err'"
+          fi
+
+          # SC2015: A && B || C anti-pattern
+          echo "=== Checking for A && B || C anti-patterns ==="
+          grep -rn '&&.*||' Linux/Lib/ Linux/Modules/ Menu.sh --include='*.sh' 2>/dev/null | \
+            grep -v '^[^:]*:[0-9]*:.*\#.*&&' || echo "  (none or false positives - review manually)"
+
+          echo "Pattern check complete."

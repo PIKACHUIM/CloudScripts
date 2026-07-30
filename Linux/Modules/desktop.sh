@@ -32,20 +32,33 @@ _de_install() {
 
     pika_info "$(t 'desk.checking')"
     # Download and execute via the dispatch function in commons.sh
+    local _tmp_script="/tmp/pika_de_$$.sh"
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "${PIKA_DESKTOP_CDN}/${script}" -o /tmp/pika_de_$$.sh && \
-        chmod +x /tmp/pika_de_$$.sh && \
-        bash -e /tmp/pika_de_$$.sh && \
-        rm -f /tmp/pika_de_$$.sh && \
-        pika_info "$(t 'common.done') - $name" || \
-        { rm -f /tmp/pika_de_$$.sh; pika_err "$(t 'common.error'): $name"; }
+        if curl -fsSL "${PIKA_DESKTOP_CDN}/${script}" -o "$_tmp_script"; then
+            chmod +x "$_tmp_script"
+            if bash -e "$_tmp_script"; then
+                rm -f "$_tmp_script"
+                pika_info "$(t 'common.done') - $name"
+            else
+                rm -f "$_tmp_script"
+                pika_err "$(t 'common.error'): $name"
+            fi
+        else
+            pika_err "$(t 'common.error'): $name (download failed)"
+        fi
     else
-        wget -qO /tmp/pika_de_$$.sh "${PIKA_DESKTOP_CDN}/${script}" && \
-        chmod +x /tmp/pika_de_$$.sh && \
-        bash -e /tmp/pika_de_$$.sh && \
-        rm -f /tmp/pika_de_$$.sh && \
-        pika_info "$(t 'common.done') - $name" || \
-        { rm -f /tmp/pika_de_$$.sh; pika_err "$(t 'common.error'): $name"; }
+        if wget -qO "$_tmp_script" "${PIKA_DESKTOP_CDN}/${script}"; then
+            chmod +x "$_tmp_script"
+            if bash -e "$_tmp_script"; then
+                rm -f "$_tmp_script"
+                pika_info "$(t 'common.done') - $name"
+            else
+                rm -f "$_tmp_script"
+                pika_err "$(t 'common.error'): $name"
+            fi
+        else
+            pika_err "$(t 'common.error'): $name (download failed)"
+        fi
     fi
 }
 

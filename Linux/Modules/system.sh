@@ -87,7 +87,7 @@ do_sys_hostname() {
 
     # Validate: RFC 952/1123 hostname rules
     if ! echo "$new_name" | grep -qE '^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$'; then
-        pika_error "$(t 'system.hostname.invalid')"
+        pika_err "$(t 'system.hostname.invalid')"
         return
     fi
 
