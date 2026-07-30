@@ -10,13 +10,13 @@
 # ============================================================
 set -e
 
-# ---- Require bash 4.0+ (associative arrays are essential for i18n) ----
+# ---- Require bash 4.3+ (nameref via local -n is essential for menu system) ----
 if [ -z "${BASH_VERSION:-}" ]; then
-    echo "ERROR: This script requires bash 4.0+. Please run: bash Menu.sh" >&2
+    echo "ERROR: This script requires bash 4.3+. Please run: bash Menu.sh" >&2
     exit 1
 fi
-if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ]; then
-    echo "ERROR: Bash 4.0+ required (current: $BASH_VERSION). Please upgrade bash." >&2
+if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ] || { [ "${BASH_VERSINFO[0]:-0}" -eq 4 ] && [ "${BASH_VERSINFO[1]:-0}" -lt 3 ]; }; then
+    echo "ERROR: Bash 4.3+ required (current: $BASH_VERSION). Please upgrade bash." >&2
     exit 1
 fi
 
@@ -185,7 +185,7 @@ menu_system() {
 
 # ---- Generic menu loop ----
 _menu_loop() {
-    local name="$1" arr_name="$2" title_key="$3"
+    local arr_name="$2" title_key="$3"
     local -n items="$arr_name"
 
     while true; do

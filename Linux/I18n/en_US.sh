@@ -9,6 +9,7 @@
 T_app_name="PIKA SH - Server Script Toolbox"
 T_app_desc="Open-source server toolbox. One command for deploy, maintain, desktop, bench & proxy."
 T_app_os="OS"
+T_app_arch="Arch"
 T_app_container="Container"
 T_app_mirror="Mirror"
 T_app_lang="Language"

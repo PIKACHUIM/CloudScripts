@@ -32,7 +32,7 @@ ui_header() {
     printf '  ║  %s%s%s%s%sv%s  ║\n' \
         "${PIKA_BOLD}" "$(t 'app.name')" "${PIKA_NC}" "${PIKA_CYAN}" "$(printf '%*s' "$ver_pad" '')" "$ver_full"
     printf '  ╚%s╝\n' "$_line"
-    printf '%s' "${PIKA_NC}"
+    printf '%s\n' "${PIKA_NC}"
 }
 
 # ---- Print section title ----
