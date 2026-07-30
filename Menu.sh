@@ -56,7 +56,42 @@ print_header() {
 }
 print_line() { echo -e "  ${CYAN}──────────────────────────────────────────────────────${NC}"; }
 print_section() { echo -e "\n  ${YELLOW}${BOLD}  $1${NC}"; }
-print_item() { printf "  ${GREEN}%4s${NC}  ${BOLD}%-28s${NC} ${BLUE}%s${NC}\n" "[$1]" "$2" "$3"; }
+
+# ---- CJK感知宽度计算 ----
+# 返回字符串在终端中的显示列宽（ASCII=1, CJK=2, emoji=2）
+# 优先 Python（通过 argv 传参避免引号问题），回退 Perl，回退 awk
+_str_w() {
+    if command -v python3 &>/dev/null; then
+        python3 - "$1" << 'PYEOF'
+import sys, unicodedata
+s = sys.argv[1]
+print(sum(2 if unicodedata.east_asian_width(c) in ('W','F') else 1 for c in s))
+PYEOF
+    elif command -v python &>/dev/null; then
+        python - "$1" << 'PYEOF'
+import sys, unicodedata
+s = sys.argv[1]
+print(sum(2 if unicodedata.east_asian_width(c) in ('W','F') else 1 for c in s))
+PYEOF
+    elif command -v perl &>/dev/null; then
+        perl -CSDA -e 'use utf8; binmode STDIN, ":utf8"; my $s = $ARGV[0]; my $w = 0; for my $c (split //, $s) { $w += 2 if $c =~ /[\x{3000}-\x{9fff}\x{ff00}-\x{ffef}\x{1f300}-\x{1f9ff}\x{2600}-\x{26ff}]/; $w += 1 if $c !~ /[\x{3000}-\x{9fff}\x{ff00}-\x{ffef}\x{1f300}-\x{1f9ff}\x{2600}-\x{26ff}]/ } print $w' -- "$1"
+    else
+        # 最后回退：sed 替换 UTF-8 多字节序列为两个字符
+        echo -n "$1" | LC_ALL=C sed 's/[\x80-\xff][\x80-\xff]\{0,3\}/__/g; s/[\x80-\xff]/__/g' | wc -c | awk '{print $1-1}'
+    fi
+}
+
+# 打印对齐：自动按显示列宽填充
+# 参数: 编号  名称  描述
+print_item() {
+    local NUM="$1" NAME="$2" DESC="$3"
+    local WIDTH=32  # 名称列目标显示宽度
+    local name_w=$(_str_w "$NAME")
+    local pad=$((WIDTH - name_w))
+    [ $pad -lt 2 ] && pad=2
+    local spaces=$(printf '%*s' $pad '')
+    printf "  ${GREEN}%4s${NC}  ${BOLD}%s${NC}${spaces}${BLUE}%s${NC}\n" "[$NUM]" "$NAME" "$DESC"
+}
 print_tip() { echo -e "  ${MAGENTA}  💡 $1${NC}"; }
 print_done() { echo -e "\n  ${GREEN}✅ $1 完成！${NC}"; }
 print_warn() { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
@@ -66,6 +101,36 @@ run_setup() { bash <(curl -s "${CDN_BASE}/Linux/VPSSets/Setup.sh") "$@"; }
 run_script_pipe() { curl -s "${CDN_BASE}/$1" | bash -e; }
 run_bench() { bash <(wget -qO- "${CDN_BASE}/Linux/VPSTest/$1"); }
 run_clean() { apt -y install curl 2>/dev/null; curl -s "${CDN_BASE}/Linux/Cleaner/LinuxClean.sh" | bash; }
+
+# ---- 获取 GitHub 最新版本号 ----
+get_gh_ver() {
+    local REPO="$1" TAG
+    TAG=$(curl -s --connect-timeout 8 --max-time 12 "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/' | head -1)
+    [ -z "$TAG" ] || [ "$TAG" = "null" ] && echo "未知(网络获取失败)" || echo "$TAG"
+}
+
+# ---- 安装前二次确认 ----
+# 参数: 名称  简介  版本信息  [官网/仓库]
+# 返回: 0=确认安装  1=取消
+confirm_install() {
+    local NAME="$1" DESC="$2" VER="$3" URL="${4:-}"
+    echo ""
+    echo -e "  ${CYAN}┌────────────────────────────────────────────────┐${NC}"
+    printf  "  ${CYAN}│${NC} ${BOLD}%-46s${NC} ${CYAN}│${NC}\n" "即将安装: ${NAME}"
+    echo -e "  ${CYAN}├────────────────────────────────────────────────┤${NC}"
+    echo -e "  ${CYAN}│${NC} 简介: ${DESC}"
+    echo -e "  ${CYAN}│${NC} 版本: ${GREEN}${VER}${NC}"
+    [ -n "$URL" ] && echo -e "  ${CYAN}│${NC} 项目: ${BLUE}${URL}${NC}"
+    echo -e "  ${CYAN}└────────────────────────────────────────────────┘${NC}"
+    echo -ne "  ${BOLD}确认安装? (y/N)${NC} > "
+    read CONFIRM
+    if [ "$CONFIRM" = "y" ] || [ "$CONFIRM" = "Y" ]; then
+        return 0
+    else
+        echo -e "  ${YELLOW}已取消安装。${NC}"
+        return 1
+    fi
+}
 
 # ============================================================
 # 安装函数库
@@ -94,6 +159,7 @@ switch_apt_mirror() {
 
 # ---- 1Panel ----
 install_1panel() {
+    confirm_install "1Panel" "现代化开源 Linux 服务器运维管理面板，支持应用商店、容器、数据库、网站一体化管理" "$(get_gh_ver 1Panel-dev/1Panel)" "https://github.com/1Panel-dev/1Panel" || return
     echo -e "\n  ${BOLD}正在安装 1Panel...${NC}"
     curl -sSL https://resource.fit2cloud.com/1panel/package/quick_start.sh -o /tmp/1panel.sh
     bash /tmp/1panel.sh
@@ -103,6 +169,7 @@ install_1panel() {
 
 # ---- NetPanel ----
 install_netpanel() {
+    confirm_install "NetPanel" "皮卡出品的轻量级服务器管理面板" "latest" "https://github.com/PIKACHUIM/NetPanel" || return
     echo -e "\n  ${BOLD}正在安装 NetPanel...${NC}"
     bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/NetPanel/main/install.sh) 2>/dev/null || {
         print_warn "NetPanel 安装脚本获取失败，请检查仓库"
@@ -112,6 +179,9 @@ install_netpanel() {
 
 # ---- Docker + 1ms 镜像源 ----
 install_docker() {
+    local CUR_VER="未安装"
+    command -v docker &>/dev/null && CUR_VER="已安装: $(docker --version 2>/dev/null | awk '{print $3}' | tr -d ',')"
+    confirm_install "Docker CE" "最流行的容器引擎，自动配置 1ms.run 国内镜像加速" "官方最新 (当前${CUR_VER})" "https://get.docker.com" || return
     echo -e "\n  ${BOLD}正在安装 Docker...${NC}"
     if command -v docker &>/dev/null; then
         echo -e "  ${GREEN}Docker 已安装: $(docker --version)${NC}"
@@ -133,6 +203,7 @@ DOCKEREOF
 
 # ---- Podman + 镜像源 ----
 install_podman() {
+    confirm_install "Podman" "无守护进程的容器引擎，Docker 的安全替代方案，自动配置 1ms.run 镜像加速" "系统仓库版本" "https://podman.io" || return
     echo -e "\n  ${BOLD}正在安装 Podman...${NC}"
     apt install -y podman 2>/dev/null || yum install -y podman 2>/dev/null || true
     mkdir -p /etc/containers
@@ -147,6 +218,7 @@ PODMANEOF
 
 # ---- 屏蔽地区 (BlockAreaBot) ----
 block_area_bot() {
+    confirm_install "BlockAreaBot" "皮卡出品，一键屏蔽指定国家/地区的入站 IP 访问" "latest" "https://github.com/PIKACHUIM/BlockAreaBot" || return
     echo -e "\n  ${BOLD}正在下载 BlockAreaBot...${NC}"
     curl -sSL "https://raw.githubusercontent.com/PIKACHUIM/BlockAreaBot/main/block.sh" -o /tmp/block_area.sh 2>/dev/null || {
         print_warn "BlockAreaBot 下载失败"; return 1
@@ -180,11 +252,11 @@ upgrade_kernel() {
 
 # ---- Clash for Linux ----
 install_clash_linux() {
-    echo -e "\n  ${BOLD}正在安装 Clash for Linux...${NC}"
     local CLASH_TAG
-    CLASH_TAG=$(curl -s --connect-timeout 10 "https://api.github.com/repos/nelvko/clash-for-linux-install/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
-    [ -z "$CLASH_TAG" ] && { print_warn "无法获取版本"; return 1; }
-    echo -e "  版本: ${CLASH_TAG}"
+    CLASH_TAG=$(get_gh_ver nelvko/clash-for-linux-install)
+    confirm_install "Clash for Linux" "基于 Mihomo(Clash) 内核的 Linux 代理客户端，支持订阅/Web面板" "$CLASH_TAG" "https://github.com/nelvko/clash-for-linux-install" || return
+    echo -e "\n  ${BOLD}正在安装 Clash for Linux...${NC}"
+    [ "$CLASH_TAG" = "未知(网络获取失败)" ] && { print_warn "无法获取版本"; return 1; }
     wget -O /tmp/clash-linux-install.tar.gz "https://github.com/nelvko/clash-for-linux-install/releases/download/${CLASH_TAG}/clash-for-linux-install-${CLASH_TAG}.tar.gz" 2>/dev/null
     if [ -f /tmp/clash-linux-install.tar.gz ]; then
         tar -xzf /tmp/clash-linux-install.tar.gz -C /tmp/
@@ -198,6 +270,7 @@ install_clash_linux() {
 
 # ---- Hysteria2 ----
 install_hy2() {
+    confirm_install "Hysteria2 (HY2)" "基于 QUIC 的高速代理协议，抗封锁、低延迟，适合弱网环境" "$(get_gh_ver apernet/hysteria)" "https://github.com/apernet/hysteria" || return
     echo -e "\n  ${BOLD}正在安装 Hysteria2...${NC}"
     bash <(curl -fsSL https://get.hy2.sh/) 2>/dev/null || {
         bash <(curl -fsSL https://raw.githubusercontent.com/apernet/hysteria/master/install_server.sh)
@@ -207,13 +280,14 @@ install_hy2() {
 
 # ---- Shadowsocks-rust ----
 install_shadowsocks() {
+    local SS_VER
+    SS_VER=$(get_gh_ver shadowsocks/shadowsocks-rust)
+    confirm_install "Shadowsocks-rust" "经典 Shadowsocks 代理的 Rust 高性能实现" "$SS_VER" "https://github.com/shadowsocks/shadowsocks-rust" || return
     echo -e "\n  ${BOLD}正在安装 Shadowsocks-rust...${NC}"
     if command -v ssserver &>/dev/null; then
         echo -e "  ${GREEN}Shadowsocks 已安装${NC}"; return 0
     fi
-    local SS_VER
-    SS_VER=$(curl -s "https://api.github.com/repos/shadowsocks/shadowsocks-rust/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
-    [ -z "$SS_VER" ] && SS_VER="v1.20.4"
+    [ "$SS_VER" = "未知(网络获取失败)" ] && SS_VER="v1.20.4"
     local ARCH; ARCH=$(uname -m)
     case "$ARCH" in x86_64) ARCH="x86_64-unknown-linux-gnu" ;; aarch64) ARCH="aarch64-unknown-linux-gnu" ;; esac
     local SS_URL="https://github.com/shadowsocks/shadowsocks-rust/releases/download/${SS_VER}/shadowsocks-${SS_VER}.${ARCH}.tar.xz"
@@ -227,10 +301,11 @@ install_shadowsocks() {
 
 # ---- Trojan-Go ----
 install_trojan() {
-    echo -e "\n  ${BOLD}正在安装 Trojan-Go...${NC}"
     local TROJ_VER
-    TROJ_VER=$(curl -s "https://api.github.com/repos/p4gefau1t/trojan-go/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
-    [ -z "$TROJ_VER" ] && TROJ_VER="v0.10.6"
+    TROJ_VER=$(get_gh_ver p4gefau1t/trojan-go)
+    confirm_install "Trojan-Go" "Trojan 协议的 Go 语言实现，伪装成 HTTPS 流量，抗封锁" "$TROJ_VER" "https://github.com/p4gefau1t/trojan-go" || return
+    echo -e "\n  ${BOLD}正在安装 Trojan-Go...${NC}"
+    [ "$TROJ_VER" = "未知(网络获取失败)" ] && TROJ_VER="v0.10.6"
     local ARCH; ARCH=$(uname -m)
     case "$ARCH" in x86_64) ARCH="amd64" ;; aarch64) ARCH="arm64" ;; esac
     local TROJ_URL="https://github.com/p4gefau1t/trojan-go/releases/download/${TROJ_VER}/trojan-go-linux-${ARCH}.zip"
@@ -243,7 +318,8 @@ install_trojan() {
 
 # ---- Cloudflare WARP ----
 install_warp() {
-    echo -e "\n  ${BOLD}正在安装 Cloudflare WARP...${NC}"
+    confirm_install "Cloudflare WARP" "Cloudflare 免费网络加速/解锁工具，可添加 IPv4/IPv6 出口，解锁 ChatGPT/Netflix 等" "官方最新" "https://pkg.cloudflareclient.com" || return
+    echo -e "\n  ${BOLD}Cloudflare WARP${NC}"
     echo -e "  ${GREEN}  [1]${NC} 安装 WARP CLI"
     echo -e "  ${GREEN}  [2]${NC} 管理 WARP (warp-cli)"
     echo -e "  ${GREEN}  [3]${NC} 安装 WGCF (WireGuard 配置生成)"
@@ -275,6 +351,7 @@ install_warp() {
 
 # ---- WireGuard ----
 install_wireguard() {
+    confirm_install "WireGuard" "现代化高性能 VPN 组网工具，安装后自动生成服务端密钥对" "系统仓库版本" "https://www.wireguard.com" || return
     echo -e "\n  ${BOLD}正在安装 WireGuard...${NC}"
     apt install -y wireguard wireguard-tools resolvconf 2>/dev/null || true
     mkdir -p /etc/wireguard
@@ -290,6 +367,7 @@ install_wireguard() {
 
 # ---- wg-easy (Docker Web管理WireGuard) ----
 install_wgeasy() {
+    confirm_install "wg-easy" "带 Web 管理界面的 WireGuard，Docker 部署，可视化管理客户端" "$(get_gh_ver wg-easy/wg-easy)" "https://github.com/wg-easy/wg-easy" || return
     echo -e "\n  ${BOLD}正在部署 wg-easy...${NC}"
     if ! command -v docker &>/dev/null; then
         print_warn "需要 Docker，请先安装 Docker"
@@ -317,8 +395,76 @@ install_wgeasy() {
 
 # ---- 3X-UI (独立安装) ----
 install_3xui() {
+    confirm_install "3X-UI 面板" "Xray-core 多协议 Web 管理面板，支持 VMess/VLESS/Trojan/Shadowsocks" "$(get_gh_ver mhsanaei/3x-ui)" "https://github.com/mhsanaei/3x-ui" || return
     echo -e "\n  ${BOLD}正在安装 3X-UI 面板...${NC}"
     bash <(curl -sL "https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh")
+}
+
+# ---- EasyTier 配置管理 ----
+ET_CONF_FILE="/etc/pikash/easytier.conf"
+manage_easytier_config() {
+    mkdir -p /etc/pikash
+    touch "$ET_CONF_FILE"
+    while true; do
+        clear_screen; print_header
+        echo -e "  ${BOLD}${CYAN}  EasyTier 组网配置管理${NC}"
+        print_line
+        echo -e "  ${BOLD}当前已配置的 config-server 列表:${NC}"
+        echo ""
+        if [ -s "$ET_CONF_FILE" ]; then
+            local i=1
+            while IFS= read -r line; do
+                [ -z "$line" ] && continue
+                printf "  ${GREEN}%3s)${NC} %s\n" "$i" "$line"
+                i=$((i+1))
+            done < "$ET_CONF_FILE"
+        else
+            echo -e "  ${YELLOW}(暂无配置)${NC}"
+        fi
+        echo ""
+        print_line
+        print_item "1"  "增加配置"                "添加一个 config-server 地址"
+        print_item "2"  "删除配置"                "按序号删除"
+        print_item "3"  "应用配置并重启 EasyTier"  "用当前配置重启组网服务"
+        print_item "0"  "返回"                    ""
+        print_line
+        echo -ne "  ${BOLD}请选择${NC} > "; read EC
+        case "$EC" in
+            1) read -p "  请输入 config-server (如 tcp://public.easytier.top:11010): " NEW_ET
+               [ -n "$NEW_ET" ] && echo "$NEW_ET" >> "$ET_CONF_FILE" && echo -e "  ${GREEN}已添加${NC}"
+               sleep 1 ;;
+            2) read -p "  请输入要删除的序号: " DEL_NUM
+               if [[ "$DEL_NUM" =~ ^[0-9]+$ ]]; then
+                   sed -i "${DEL_NUM}d" "$ET_CONF_FILE" && echo -e "  ${GREEN}已删除第 ${DEL_NUM} 条${NC}"
+               fi
+               sleep 1 ;;
+            3) apply_easytier_config ;;
+            0) break ;;
+            *) echo -e "  ${RED}无效选项${NC}"; sleep 1 ;;
+        esac
+    done
+}
+
+apply_easytier_config() {
+    if [ ! -s "$ET_CONF_FILE" ]; then
+        print_warn "没有可用配置，请先添加"; sleep 2; return 1
+    fi
+    if ! command -v easytier-core &>/dev/null && [ ! -f /bin/easytier-core ]; then
+        confirm_install "EasyTier" "去中心化 P2P 组网工具，支持内网穿透与异地组网" "$(get_gh_ver EasyTier/EasyTier)" "https://github.com/EasyTier/EasyTier" || return
+        echo -e "  ${BOLD}正在安装 EasyTier...${NC}"
+        run_setup 7nocfg
+    fi
+    # 组装多个 --config-server 参数
+    local ARGS=""
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        ARGS="$ARGS --config-server $line"
+    done < "$ET_CONF_FILE"
+    echo -e "  应用参数:${ARGS}"
+    pm2 delete easytier 2>/dev/null || true
+    pm2 start /bin/easytier-core --name easytier -- $ARGS 2>/dev/null && pm2 save
+    print_done "EasyTier 配置已应用并重启"
+    sleep 2
 }
 
 # ---- BBR 加速 ----
@@ -357,6 +503,7 @@ install_bbr() {
 
 # ---- BBR3/BBRPlus 多合一 (ylx2016) ----
 install_bbrplus() {
+    confirm_install "BBRPlus/BBR2/BBR3 多合一" "ylx2016 出品，一键编译安装多版本 BBR 及锐速内核 (需重启)" "master" "https://github.com/ylx2016/Linux-NetSpeed" || return
     echo -e "\n  ${BOLD}正在安装 BBRPlus/BBR2/BBR3 多合一...${NC}"
     wget -O /tmp/tcpx.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcpx.sh" 2>/dev/null
     chmod +x /tmp/tcpx.sh
@@ -412,6 +559,7 @@ ZRAMEOF
 
 # ---- Fail2ban 防爆破 ----
 install_fail2ban() {
+    confirm_install "Fail2ban" "SSH 防暴力破解工具，自动封禁多次登录失败的 IP (默认3次失败封24h)" "系统仓库版本" "https://github.com/fail2ban/fail2ban" || return
     echo -e "\n  ${BOLD}正在安装 Fail2ban...${NC}"
     apt install -y fail2ban 2>/dev/null || yum install -y fail2ban 2>/dev/null || true
     cat > /etc/fail2ban/jail.local << 'F2BEOF'
@@ -498,6 +646,7 @@ install_acme() {
 
 # ---- Aria2 下载器 ----
 install_aria2() {
+    confirm_install "Aria2" "多协议轻量下载器 (HTTP/FTP/BT/磁力)，systemd 服务化 + RPC(端口6800)" "系统仓库版本" "https://aria2.github.io" || return
     echo -e "\n  ${BOLD}正在安装 Aria2...${NC}"
     apt install -y aria2 2>/dev/null || yum install -y aria2 2>/dev/null || true
     mkdir -p /etc/aria2 /opt/aria2/downloads
@@ -812,6 +961,7 @@ sub_proxy() {
     print_item "6"  "Cloudflare WARP"           "WARP CLI / WGCF 一键部署+管理"
     print_item "7"  "WireGuard 部署"            "原生 WireGuard 安装+密钥生成"
     print_item "8"  "wg-easy 部署"              "Docker Web 管理 WireGuard"
+    print_item "9"  "EasyTier 组网配置"         "增加/删除/查看 config-server 并应用"
 
     print_line
     print_item "0"  "返回主菜单"                ""
@@ -829,6 +979,7 @@ exec_proxy() {
         6) install_warp ;;
         7) install_wireguard ;;
         8) install_wgeasy ;;
+        9) manage_easytier_config ;;
         0) return 1 ;;
         *) echo -e "  ${RED}无效: $1${NC}" ;;
     esac; return 0

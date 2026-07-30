@@ -177,25 +177,50 @@ setup_3xui() {
 }
 
 setup_easytier() {
-    echo -n "是否安装EasyTier? (y/N): "; read INSTALL_ET
-    [ "$INSTALL_ET" != "y" ] && return 0
-    read -p "  请输入 EasyTier 配置 (如 tcp://public.easytier.top:11010): " ET_CONFIG
-    [ -z "$ET_CONFIG" ] && { echo "EasyTier 配置不能为空，已跳过。"; return 1; }
-    ET_TAG=$(get_latest_github_tag "EasyTier/EasyTier")
-    [ -z "$ET_TAG" ] && { echo "无法获取EasyTier版本，已跳过。"; return 1; }
-    echo "获取到最新的ET版本: ${ET_TAG}"
-    ET_FILE="easytier-linux-x86_64-${ET_TAG}.zip"
-    download_github_file "EasyTier/EasyTier/releases/download/${ET_TAG}/${ET_FILE}" "${ET_FILE}" "EasyTier/EasyTier"
-    if [ -f "${ET_FILE}" ] && [ -s "${ET_FILE}" ]; then
-        unzip -o "${ET_FILE}"
-        chmod -R +x easytier-linux-x86_64
-        mv easytier-linux-x86_64/* /bin/
-        rm -f "${ET_FILE}"; rm -rf easytier-linux-x86_64
-        pm2 start /bin/easytier-core --name easytier -- --config-server ${ET_CONFIG}
-        pm2 save
-        echo "ET服务安装完成。"
+    # $1 = "nocfg" 时跳过询问直接安装二进制（供 Menu.sh 配置管理调用）
+    local NOCFG="$1"
+    if [ "$NOCFG" != "nocfg" ]; then
+        echo -n "是否安装EasyTier? (y/N): "; read INSTALL_ET
+        [ "$INSTALL_ET" != "y" ] && return 0
+    fi
+    # 若已安装则跳过下载
+    if [ -f /bin/easytier-core ]; then
+        echo "EasyTier 已安装 (/bin/easytier-core)。"
     else
-        echo "ET安装失败。"
+        ET_TAG=$(get_latest_github_tag "EasyTier/EasyTier")
+        [ -z "$ET_TAG" ] && { echo "无法获取EasyTier版本，已跳过。"; return 1; }
+        echo "获取到最新的ET版本: ${ET_TAG}"
+        ET_FILE="easytier-linux-x86_64-${ET_TAG}.zip"
+        download_github_file "EasyTier/EasyTier/releases/download/${ET_TAG}/${ET_FILE}" "${ET_FILE}" "EasyTier/EasyTier"
+        if [ -f "${ET_FILE}" ] && [ -s "${ET_FILE}" ]; then
+            unzip -o "${ET_FILE}"
+            chmod -R +x easytier-linux-x86_64
+            mv easytier-linux-x86_64/* /bin/
+            rm -f "${ET_FILE}"; rm -rf easytier-linux-x86_64
+            echo "ET 二进制安装完成 (/bin/easytier-core)。"
+        else
+            echo "ET安装失败。"
+            return 1
+        fi
+    fi
+    # 组网配置从配置文件读取（在 Menu.sh 的“代理配置 → EasyTier 组网配置”中管理）
+    local ET_CONF_FILE="/etc/pikash/easytier.conf"
+    if [ "$NOCFG" = "nocfg" ]; then
+        echo "二进制已就绪，请在“代理配置 → EasyTier 组网配置”中添加并应用配置。"
+        return 0
+    fi
+    if [ -s "$ET_CONF_FILE" ]; then
+        local ARGS=""
+        while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            ARGS="$ARGS --config-server $line"
+        done < "$ET_CONF_FILE"
+        pm2 delete easytier 2>/dev/null || true
+        pm2 start /bin/easytier-core --name easytier -- $ARGS
+        pm2 save
+        echo "ET 服务已按配置文件启动。"
+    else
+        echo "未检测到组网配置，请在“代理配置 → EasyTier 组网配置”中添加。"
     fi
 }
 
@@ -374,7 +399,7 @@ show_menu() {
     echo "    [4]  安装宝塔面板"
     echo "    [5]  安装哪吒面板"
     echo "    [6]  安装 3XUI 面板"
-    echo "    [7]  安装 EasyTier (ET)"
+    echo "    [7]  安装 EasyTier (ET, 组网配置在代理配置中管理)"
     echo "    [8]  安装 FRPS 服务"
     echo ""
     echo "  端口限速:"
@@ -412,6 +437,7 @@ process_choice() {
         5)   setup_nezha ;;
         6)   setup_3xui ;;
         7)   setup_easytier ;;
+        7nocfg) setup_easytier nocfg ;;
         8)   setup_frps ;;
         9)   setup_rate_limit_menu ;;
         A|a) setup_rustdesk ;;
