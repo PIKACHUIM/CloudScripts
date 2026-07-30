@@ -264,10 +264,10 @@ exec_bench() {
 main_menu() {
     clear_screen; print_header
     print_line
-    print_item "1"  "🖥️  一键部署"               "系统初始化/面板/探针/组网/中转"
-    print_item "2"  "🔧 日常维护"               "系统清理、端口限速"
-    print_item "3"  "🎨 桌面安装"               "Debian LXC 8种桌面一键安装"
-    print_item "4"  "📊 性能测评"               "综合测评 + 网络诊断 13款工具"
+    print_item "1"  "🖥️ 一键部署"             "一键换源/面板/探针/组网/中转"
+    print_item "2"  "🔧 日常维护"             "垃圾清理/限速/更新/屏蔽/加速"
+    print_item "3"  "🎨 桌面安装"             "桌面安装/配置/更新/维护/卸载"
+    print_item "4"  "📊 性能测评"             "测评性能/网络/线路/延迟/回程"
     print_line
     print_item "0"  "退出"                      ""
     print_line
