@@ -1,98 +1,121 @@
 #!/usr/bin/env bash
 # ============================================================
 #  PIKA SH - I18n / Localization
-#  Auto-detect locale, load language pack, t() translation function
-#  Requires: 00-core.sh loaded first, bash 4.0+
+#  Uses flat variable names (T_key_name=value) — no associative
+#  arrays needed.  Keys use dot separators in t() calls, which
+#  are mapped to underscores internally.
+#  Requires: 00-core.sh loaded first
 # ============================================================
 set -e
 
-# ---- Require bash 4.0+ for associative arrays ----
+# ---- Require bash ----
 if [ -z "${BASH_VERSION:-}" ]; then
-    echo "ERROR: This script requires bash 4.0+. Please run: bash Menu.sh" >&2
-    exit 1
-fi
-if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ]; then
-    echo "ERROR: Bash 4.0+ required (current: $BASH_VERSION). Please upgrade bash." >&2
+    echo "ERROR: This script requires bash. Please run: bash Menu.sh" >&2
     exit 1
 fi
 
-# ---- Language detection order ----
-# PIKA_LANG env > /etc/pika-sh/config > LC_ALL > LC_MESSAGES > LANG > fallback (zh_CN)
+# ============================================================
+#  Language detection
+# ============================================================
 i18n_detect() {
-    # 1. Explicit env var
     [ -n "${PIKA_LANG:-}" ] && { echo "$PIKA_LANG"; return; }
-
-    # 2. Persisted config
     local persisted; persisted=$(pika_config_get "lang" 2>/dev/null || true)
     [ -n "$persisted" ] && { echo "$persisted"; return; }
-
-    # 3. System locale
     local sys_lang="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"
-    sys_lang="${sys_lang%%.*}"  # Strip encoding suffix: zh_CN.UTF-8 -> zh_CN
-
+    sys_lang="${sys_lang%%.*}"
     case "${sys_lang,,}" in
         zh_cn|zh_sg|zh_hk|zh_tw|zh) echo "zh_CN" ;;
         en_us|en_gb|en_au|en_ca|en_nz|en_ie|en) echo "en_US" ;;
-        *) echo "zh_CN" ;;  # Default: Chinese
+        *) echo "zh_CN" ;;
     esac
 }
 
-# ---- Translation table ----
-declare -A T
+# ============================================================
+#  Translation function — flat variables, no associative arrays
+#  t() converts "app.name" → variable T_app_name
+# ============================================================
+t() {
+    local key="$1"; shift
+    local varname="T_${key//./_}"
+    local msg="${!varname}"
+    if [ $# -gt 0 ]; then
+        printf "${msg:-$key}" "$@"
+    else
+        echo -n "${msg:-$key}"
+    fi
+}
 
-# ---- Load language pack ----
-# Always load zh_CN first (complete fallback), then overlay target language
+# ============================================================
+#  Load language pack — local first, then remote CDN fallback
+# ============================================================
+_i18n_source_pack() {
+    local lang="$1"   # e.g., "zh_CN" or "en_US"
+    local pack_file="I18n/${lang}.sh"
+    local local_path remote_url loaded=0
+
+    # ----- Try PIKA_BASE/Linux/I18n/xx.sh (correct local path) -----
+    local_path="${PIKA_BASE:-.}/Linux/${pack_file}"
+    if [ -f "$local_path" ]; then
+        . "$local_path"
+        loaded=1
+    fi
+
+    # ----- Try CDN fallback -----
+    if [ "$loaded" = "0" ]; then
+        local tmpf; tmpf=$(mktemp 2>/dev/null || echo "/tmp/pika-i18n-$$")
+        # Try multiple CDN sources
+        for base_url in \
+            "https://gh-bat.pika.net.cn/Linux/${pack_file}" \
+            "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/${pack_file}" \
+            "https://github.524228.xyz/PIKACHUIM/CloudScripts/main/Linux/${pack_file}"
+        do
+            if curl -fsSL "$base_url" -o "$tmpf" 2>/dev/null; then
+                . "$tmpf"
+                loaded=1
+                break
+            fi
+            if wget -qO "$tmpf" "$base_url" 2>/dev/null; then
+                . "$tmpf"
+                loaded=1
+                break
+            fi
+        done
+        rm -f "$tmpf" 2>/dev/null || true
+    fi
+
+    return "$loaded"
+}
+
 i18n_load() {
     local lang="${1:-$(i18n_detect)}"
 
-    # Base: zh_CN (most complete, serves as fallback)
-    local base_pack="${PIKA_LIB_DIR:-${PIKA_BASE:-.}/Linux/Lib/..}/I18n/zh_CN.sh"
-    if [ -f "$base_pack" ]; then
-        source "$base_pack"
-    elif [ -f "${PIKA_BASE:-.}/Linux/I18n/zh_CN.sh" ]; then
-        source "${PIKA_BASE:-.}/Linux/I18n/zh_CN.sh"
-    fi
+    # Always load zh_CN as base (most complete)
+    _i18n_source_pack "zh_CN" || true
 
-    # Overlay: target language
+    # Overlay target language
     if [ "$lang" != "zh_CN" ]; then
-        local pack="${PIKA_LIB_DIR:-${PIKA_BASE:-.}/Linux/Lib/..}/I18n/${lang}.sh"
-        if [ -f "$pack" ]; then
-            source "$pack"
-        elif [ -f "${PIKA_BASE:-.}/Linux/I18n/${lang}.sh" ]; then
-            source "${PIKA_BASE:-.}/Linux/I18n/${lang}.sh"
-        fi
+        _i18n_source_pack "$lang" || true
     fi
 
     PIKA_LANG="$lang"
     export PIKA_LANG
 }
 
-# ---- Translate a key ----
-# Usage: t "key" [arg1 arg2 ...]  # printf-style substitution
-t() {
-    local key="$1"; shift
-    local msg="${T[$key]:-$key}"  # Missing key: return key itself (never blank)
-    if [ $# -gt 0 ]; then
-        # shellcheck disable=SC2059
-        printf "$msg" "$@"
-    else
-        echo -n "$msg"
-    fi
-}
-
-# ---- Set language and persist ----
+# ============================================================
+#  Set language and persist
+# ============================================================
 i18n_set_lang() {
     local lang="$1"
     case "$lang" in
         zh_CN|en_US) ;;
         zh) lang="zh_CN" ;;
         en) lang="en_US" ;;
-        *) pika_warn "不支持的语言: $lang，可用: zh_CN, en_US"; return 1 ;;
+        *) pika_warn "Unsupported language: $lang (available: zh_CN, en_US)"; return 1 ;;
     esac
     PIKA_LANG="$lang"
     pika_config_set "lang" "$lang"
     i18n_load "$lang"
-    pika_info "语言已切换为: $lang"
+    pika_info "Language: $lang"
 }
 
 # ---- Auto-load on source ----
