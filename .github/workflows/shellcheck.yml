@@ -1,0 +1,55 @@
+name: ShellCheck Lint
+
+on:
+  push:
+    paths:
+      - '**/*.sh'
+  pull_request:
+    paths:
+      - '**/*.sh'
+  workflow_dispatch:
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: '.'
+          format: tty
+          severity: error
+          ignore_paths: |
+            Linux/VPSTest/ecss-bench/*
+            Linux/VPSTest/yabs-bench/*
+            Linux/VPSTest/lemonbench/*
+            Linux/VPSTest/superbench/*
+            Linux/VPSTest/unix-bench/*
+            Linux/VPSTest/supertrace/*
+            Linux/VPSTest/best-trace/*
+            Linux/VPSTest/back-trace/*
+            Linux/VPSTest/mping-test/*
+            Linux/VPSTest/qsyb-bench/*
+            Linux/VPSTest/ip-quality/*
+            Linux/VPSTest/superspeed/*
+
+      - name: Verify i18n key consistency
+        run: |
+          echo "Checking i18n key consistency..."
+          zh_keys=$(grep -oP 'T\["[^"]+"\]' Linux/I18n/zh_CN.sh | sort -u)
+          en_keys=$(grep -oP 'T\["[^"]+"\]' Linux/I18n/en_US.sh | sort -u)
+
+          # en_US should be a subset of zh_CN (zh_CN is the fallback)
+          extra_in_en=$(comm -23 <(echo "$en_keys") <(echo "$zh_keys") || true)
+          if [ -n "$extra_in_en" ]; then
+            echo "WARNING: Keys in en_US but not in zh_CN (no fallback!):"
+            echo "$extra_in_en"
+          fi
+
+          echo "zh_CN keys: $(echo "$zh_keys" | wc -l)"
+          echo "en_US keys: $(echo "$en_keys" | wc -l)"
+          echo "i18n check complete."

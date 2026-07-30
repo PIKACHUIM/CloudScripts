@@ -1,15 +1,35 @@
 #!/bin/bash
-# Check -----------------------------------------------------------
-file="/etc/lxc-de-flag"
+# Deepin Desktop Environment (flag=1)
+# Uses GXDE (GXDE Desktop Environment) - Deepin-style DE for Debian
+
 set -e
-if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
-    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
-	apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
+# Dual-mode commons.sh loading: local file > remote CDN
+if [ -f "$(dirname "$0")/commons.sh" ] && [ "$(dirname "$0")" != "." ]; then
+    . "$(cd "$(dirname "$0")" && pwd)/commons.sh"
 else
-    read -r content < "$file"      # 去掉前后空白，只读第一行
+    _tmp_commons=$(mktemp)
+    curl -fsSL "https://gh-bat.pika.net.cn/Linux/Desktop/commons.sh" -o "$_tmp_commons" 2>/dev/null || \
+        wget -qO "$_tmp_commons" "https://gh-bat.pika.net.cn/Linux/Desktop/commons.sh" || \
+        { echo "ERROR: Cannot load commons.sh" >&2; rm -f "$_tmp_commons"; exit 1; }
+    . "$_tmp_commons"
+    rm -f "$_tmp_commons"
+fi
+
+# Check
+file="/etc/lxc-de-flag"
+if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
+    echo "检查通过，开始安装 Server 基础环境....."
+    de_run_remote "LXC-Debian-Server.sh"
+    echo "检查通过，开始安装 X11 图形栈....."
+    de_run_remote "LXC-Debian-Graphy.sh"
+else
+    read -r content < "$file"
     case "$content" in
-        0) apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e ;;
-        9) echo "检查通过，开始安装桌面....." ;;
+        0)
+            echo "检查通过，开始安装 X11 图形栈....."
+            de_run_remote "LXC-Debian-Graphy.sh"
+            ;;
+        9) echo "检查通过，开始安装 Deepin 桌面....." ;;
         *) echo "已经安装过桌面，禁止重复安装" && exit ;;
     esac
 fi
@@ -46,4 +66,4 @@ echo 'echo Starting Desktop Runtime ----------'  >> /run.sh
 echo 'export DISPLAY=:9 &&export $(dbus-launch)' >> /run.sh
 echo 'nohup Xvfb :9 -ac -screen 0 1600x900x24 &' >> /run.sh
 echo 'nohup startdde &                         ' >> /run.sh
-echo 1 > /etc/lxc-de-flag
+de_finish 1

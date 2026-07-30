@@ -1,24 +1,22 @@
 #!/bin/bash
-# GNOME 3 Desktop Environment
+# GNOME 3 Desktop Environment (flag=6)
 # 基于 RDDocker: https://github.com/PIKACHUIM/RDDocker/blob/master/scripts/install/desktop/gnome3.sh
 
 set -e
-INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
-. "$INSTALL_DIR/commons.sh"
-
-# Check -----------------------------------------------------------
-file="/etc/lxc-de-flag"
-if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
-    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
-    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
+# Dual-mode commons.sh loading: local file > remote CDN
+if [ -f "$(dirname "$0")/commons.sh" ] && [ "$(dirname "$0")" != "." ]; then
+    . "$(cd "$(dirname "$0")" && pwd)/commons.sh"
 else
-    read -r content < "$file"
-    case "$content" in
-        0) apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e ;;
-        9) echo "检查通过，开始安装 GNOME 桌面....." ;;
-        *) echo "已经安装过桌面，禁止重复安装" && exit ;;
-    esac
+    _tmp_commons=$(mktemp)
+    curl -fsSL "https://gh-bat.pika.net.cn/Linux/Desktop/commons.sh" -o "$_tmp_commons" 2>/dev/null || \
+        wget -qO "$_tmp_commons" "https://gh-bat.pika.net.cn/Linux/Desktop/commons.sh" || \
+        { echo "ERROR: Cannot load commons.sh" >&2; rm -f "$_tmp_commons"; exit 1; }
+    . "$_tmp_commons"
+    rm -f "$_tmp_commons"
 fi
+
+# Check
+de_precheck "GNOME" "6"
 
 _ubver="${VERSION_ID%%.*}"
 _is_ubuntu26=false
@@ -105,4 +103,4 @@ bash /x11vnc.sh DISPLAY=:9
 nohup gnome-session &
 EOF
 fi
-echo 6 > /etc/lxc-de-flag
+de_finish 6

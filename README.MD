@@ -2,13 +2,14 @@
   <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/License-GPL%20%7C%20MIT-green?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/Shell-Bash%20%7C%20PowerShell-orange?style=flat-square" alt="Shell">
+  <a href="https://github.com/PIKACHUIM/CloudScripts/actions/workflows/shellcheck.yml"><img src="https://github.com/PIKACHUIM/CloudScripts/actions/workflows/shellcheck.yml/badge.svg" alt="ShellCheck"></a>
 </p>
 
 <h1 align="center">⚡ 皮卡在线脚本托管平台</h1>
 <p align="center"><strong>Pika Online Script Hosting Platform</strong></p>
 
 <p align="center">
-  一键部署 · 性能测评 · 网络诊断 · 桌面环境 · 容器引擎
+  一键部署 · 性能测评 · 网络诊断 · 桌面环境 · 容器引擎 · 🇨🇳 大陆加速 · 🌐 多语言
 </p>
 
 <p align="center">
@@ -17,6 +18,26 @@
 </p>
 
 ---
+
+### 架构
+
+```
+Menu.sh (引导器 ~230行)
+├── Lib/00-core.sh    日志/配置/系统检测
+├── Lib/10-net.sh     多级镜像探测/统一下载
+├── Lib/20-pkg.sh     6种包管理器抽象
+├── Lib/30-svc.sh     PM2/systemd/nohup 统一托管
+├── Lib/40-ui.sh      菜单渲染/CJK对齐
+├── Lib/50-i18n.sh    多语言自动切换
+├── I18n/zh_CN.sh     中文语言包 (兜底)
+├── I18n/en_US.sh     英文语言包
+├── Modules/deploy.sh     部署安装模块
+├── Modules/maintain.sh   系统维护模块
+├── Modules/desktop.sh    桌面安装模块
+├── Modules/bench.sh      性能测评模块
+├── Modules/proxy.sh      代理组网模块
+└── Modules/system.sh     系统工具模块
+```
 
 ## 🚀 快速开始
 
@@ -35,13 +56,41 @@ bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Men
 
 | 类别 | 说明 |
 |:-----|:-----|
-| 🖥️ **一键部署** | 换源/面板(宝塔/1Panel/NetPanel/FRP)/探针/Docker+Podman/组网/中转 |
-| 🔧 **日常维护** | 清理/BBR加速/Swap管理/Fail2ban/UFW防火墙/DD重装/ACME证书/Aria2/监控 |
-| 🎨 **桌面安装** | Debian LXC 容器 8 种桌面一键安装 |
-| 📊 **性能测评** | 融合怪/IP质量/LemonBench/YABS/UnixBench 等 8 款 + 网络诊断 5 款 |
-| 🌐 **代理配置** | 3X-UI/Clash/Hysteria2/SS/Trojan/WARP/WireGuard/wg-easy |
+| 🖥️ **1. 部署安装** | 换源/面板(宝塔/1Panel/NetPanel)/探针/Docker+Podman/组网/Node+PM2 |
+| 🔧 **2. 系统维护** | 清理/BBR加速/BBRPlus/Swap管理/Fail2ban/UFW防火墙/DD重装/内核管理 |
+| 🎨 **3. 桌面安装** | Debian LXC 容器桌面：Xfce4/GNOME3/Plasma/MATE/Deepin/Lingmo/Hyprland/Niri (共8种) |
+| 📊 **4. 性能测评** | 融合怪/IP质量/LemonBench/YABS/UnixBench/SuperBench/SuperSpeed/BestTrace 等 13 项 |
+| 🌐 **5. 代理组网** | 3X-UI/Clash/Hysteria2/SS-rust/Trojan-Go/WARP/WireGuard/wg-easy |
+| 🛠️ **6. 系统工具** | SSH加固/时区校时/系统信息/自更新/快捷命令/卸载回滚 |
 
-> 也可直接输入对应编号跳转：`bash Menu.sh 20` 直接运行融合怪测评。
+> 中国大陆用户可直接使用，脚本内置**多级镜像自动探测**，无需手动指定加速通道。
+
+### 新增特性 (v1.0)
+
+- 🌐 **大陆网络加速**：多级镜像通道自动探测，抗 DNS 污染校验，24h 缓存
+- 🌍 **中英双语**：按系统语言自动切换，支持 `--lang=en_US` 手动指定
+- 🔧 **统一服务托管**：PM2 优先 > systemd 次选 > nohup 降级，提供统一的启停/日志/卸载接口
+- 📦 **按需加载**：主入口轻量化 (~230行)，业务模块按需下载缓存
+- 🛡️ **安全加固**：随机口令、sysctl 幂等写入、危险操作二次确认
+- 🔄 **脚本自更新**：支持快捷命令 `p` 一键启动
+
+### 命令行参数
+
+```bash
+bash Menu.sh [分类] [项目] [选项]
+
+选项:
+  --lang=zh_CN|en_US     切换语言
+  --mirror=URL            强制指定镜像通道
+  --backend=pm2|systemd   强制指定服务后端
+  --yes, -y               跳过所有确认提示
+  --help, -h              显示帮助
+
+示例:
+  bash Menu.sh 1 1        直达"部署安装 > 换源"
+  bash Menu.sh 3          进入"桌面环境"菜单
+  bash Menu.sh --lang=en_US
+```
 
 ---
 

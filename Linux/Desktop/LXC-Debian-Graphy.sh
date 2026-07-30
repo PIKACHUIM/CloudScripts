@@ -15,8 +15,11 @@ else
 fi
 
 # Install Xserver -------------------------------------------------
-echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d
-DEBIAN_FRONTEND=noninteractive apt update && /sbin/init & 
+# Fix policy-rc.d: use exit 101 to suppress service auto-start in containers
+# (exit 0 would allow unwanted service startups during package install)
+printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d
+chmod +x /usr/sbin/policy-rc.d
+DEBIAN_FRONTEND=noninteractive apt update
 DEBIAN_FRONTEND=noninteractive apt install -y pulseaudio 
 apt install apt-transport-https ca-certificates curl   -y
 apt update && DEBIAN_FRONTEND=noninteractive apt install -y   \
@@ -59,4 +62,4 @@ echo '/etc/NX/nxserver --startup'               >> /run.sh
 echo '/etc/NX/nxserver --restart'               >> /run.sh
 echo 'echo Starting VNC ---------------------'  >> /run.sh
 echo 'export HOME=/root && bash /x11vnc.sh   '  >> /run.sh
-echo 9 > /etc/lxc-de-flag
+de_finish 9

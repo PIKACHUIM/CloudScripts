@@ -1,0 +1,46 @@
+name: Pages Deploy
+
+on:
+  push:
+    branches: [assets]
+  workflow_dispatch:
+
+jobs:
+  deploy-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout assets branch
+        uses: actions/checkout@v4
+        with:
+          ref: assets
+
+      - name: Ensure healthz probe file exists
+        run: |
+          if [ ! -f .pika-healthz ]; then
+            printf 'PIKA_SH_OK\nversion=1.0\nmirror=assets\n' > .pika-healthz
+          fi
+          # Also place in subdirs that might be deployed independently
+          for d in ecss-bench yabs-bench unix-bench lemonbench superbench superspeed qsyb-bench back-trace best-trace supertrace mping-test ip-quality; do
+            [ -d "$d" ] && cp .pika-healthz "$d/"
+          done
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
