@@ -17,13 +17,13 @@ bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Men
 
 启动后你会看到分类清晰的菜单，输入编号即可执行对应脚本：
 
-| 类别 | 编号 | 功能 |
-|:-----|:----:|:-----|
-| 🖥️ 服务器部署 | 1-4 | VPS 一键部署、系统清理、3X-UI 面板、端口限速 |
-| 🎨 桌面环境 | 10-17 | Debian LXC 容器 8 种桌面一键安装 |
-| 📊 性能测评 | 20-27 | 融合怪/IP质量/LemonBench/YABS/UnixBench 等 |
-| 🌐 网络诊断 | 30-34 | 回程路由/全国Ping/Speedtest 等 |
-| 🪟 Windows | 1-10 | Docker CE / Mirantis / nerdctl / MAS 激活 |
+| 类别 | 说明 |
+|:-----|:-----|
+| 🖥️ **一键部署** | 换源/面板/探针/Docker+Podman/组网/中转 |
+| 🔧 **日常维护** | 清理/BBR/Swap/Fail2ban/UFW/DD重装/ACME/Aria2/监控 |
+| 🎨 **桌面安装** | Debian LXC 容器 8 种桌面 |
+| 📊 **性能测评** | 13款测评+网络诊断工具 |
+| 🌐 **代理配置** | 3X-UI/Clash/HY2/SS/Trojan/WARP/WireGuard/wg-easy |
 
 > 也支持直接传参：`bash Menu.sh 20` 直接运行融合怪测评。
 

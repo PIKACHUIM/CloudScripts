@@ -33,13 +33,13 @@ bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Men
 
 ### 菜单一览
 
-| 类别 | 编号 | 功能 |
-|:-----|:----:|:-----|
-| 🖥️ 服务器部署 | 1-4 | VPS 一键部署、系统清理、3X-UI 面板、端口限速 |
-| 🎨 桌面环境 | 10-17 | Debian LXC 容器 8 种桌面一键安装 |
-| 📊 性能测评 | 20-27 | 融合怪/IP质量/LemonBench/YABS/UnixBench 等 8 款工具 |
-| 🌐 网络诊断 | 30-34 | 回程路由/全国Ping/Speedtest 等 5 款工具 |
-| 🪟 Windows | - | Docker CE · Mirantis · nerdctl · MAS 激活 |
+| 类别 | 说明 |
+|:-----|:-----|
+| 🖥️ **一键部署** | 换源/面板(宝塔/1Panel/NetPanel/FRP)/探针/Docker+Podman/组网/中转 |
+| 🔧 **日常维护** | 清理/BBR加速/Swap管理/Fail2ban/UFW防火墙/DD重装/ACME证书/Aria2/监控 |
+| 🎨 **桌面安装** | Debian LXC 容器 8 种桌面一键安装 |
+| 📊 **性能测评** | 融合怪/IP质量/LemonBench/YABS/UnixBench 等 8 款 + 网络诊断 5 款 |
+| 🌐 **代理配置** | 3X-UI/Clash/Hysteria2/SS/Trojan/WARP/WireGuard/wg-easy |
 
 > 也可直接输入对应编号跳转：`bash Menu.sh 20` 直接运行融合怪测评。
 
@@ -47,52 +47,63 @@ bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Men
 
 ## 📦 功能详解
 
-### 🖥️ 服务器部署与管理
-
-#### VPS 一键部署 `Menu → 1`
-
-交互式部署脚本，覆盖一台新 VPS 从零到可用的全部步骤。敏感信息使用 **AES-256-CBC + PBKDF2** 加密存储，运行时输入密码解密。
+### 🖥️ 一键部署
 
 <details>
 <summary>📋 包含模块（点击展开）</summary>
 
 | 模块 | 说明 |
 |:-----|:-----|
+| 换大陆镜像源 | Debian/Ubuntu USTC 源自动切换 |
 | 系统初始化 | 更新系统、安装 curl/wget/nano/git/htop/vim 等常用工具 |
-| ProxyChains4 | 配置 SOCKS5 代理链，加速 GitHub 资源下载 |
-| Node.js LTS | 通过 NVM 安装，配置 npmmirror 源 + PM2 进程管理 |
+| Docker + 1ms 镜像 | Docker CE + 国内镜像加速 |
+| Podman + 镜像 | Podman + registries 镜像加速 |
 | 宝塔面板 | 自动安装并配置用户名、密码、面板端口 |
-| 哪吒探针 | 安装 Agent 并自动注册到服务端 |
-| 3X-UI 面板 | 安装 Xray-core 多协议代理面板，自动生成 TLS 证书 |
-| EasyTier | 获取最新版部署组网服务（PM2 托管） |
-| FRP Panel | 安装 frp-panel 客户端/服务端节点（PM2 托管） |
-| 端口限速 | tc+IFB 双向流量限速，支持端口范围和自定义速率 |
+| 1Panel | 现代化开源面板一键安装 |
+| FRP Panel | 内网穿透面板 (PM2) |
+| NetPanel | 轻量服务器管理面板 |
+| 哪吒探针 | Agent 自动注册 |
+| Node.js + PM2 | NVM + npmmirror 源 |
+| EasyTier | P2P 组网 |
+| RustDesk/ZeroTier/Tailscale | 中转与组网 |
 
 </details>
 
-```bash
-# 生成加密凭据（仅需运行一次）
-bash Linux/VPSSets/Vault.sh
-```
+---
 
-#### 系统清理 `Menu → 2`
+### 🔧 日常维护
 
-```bash
-curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Cleaner/LinuxClean.sh | bash
-```
+| 分类 | 功能 | 说明 |
+|:-----|:-----|:-----|
+| 系统优化 | 垃圾清理 | apt缓存/journal/Docker/bash历史 |
+| | Swap 管理 | 添加/删除/Zram 虚拟内存 |
+| | BBR 加速 | 原生BBR / BBR3+FQ / BBR+Cake |
+| | BBRPlus/BBR2/BBR3 | ylx2016 多版本一键 |
+| | TCP 优化 | FastOpen/缓冲/backlog |
+| 安全防护 | UFW 防火墙 | 一键配置/端口管理 |
+| | Fail2ban | SSH 防暴力破解 24h封禁 |
+| | BlockAreaBot | 一键屏蔽指定国家/地区 IP |
+| 系统管理 | 端口限速 | tc+IFB 双向限速 |
+| | 升级内核 | XanMod/Liquorix/Backports/HWE |
+| | DD 系统重装 | bin456789 一键重装 Debian/Ubuntu/Win |
+| 常用工具 | ACME 证书 | Let's Encrypt 免费SSL签发/续期 |
+| | Aria2 下载器 | 离线下载+RPC (端口6800) |
+| | 服务器监控 | Netdata/Cockpit/Glances |
 
-清理 bash 历史、apt 缓存、journal 日志、Docker 垃圾、缩略图缓存、崩溃日志和临时文件。
+---
 
-#### 3X-UI 面板 `Menu → 3`
+### 🌐 代理配置
 
-Xray-core 多协议代理管理面板，支持 VMess / VLESS / Trojan / Shadowsocks。
-
-#### 端口限速 `Menu → 4`
-
-使用 `tc` + `IFB` 对指定端口进行出入双向流量限速：
-- 支持单个端口、多端口、端口范围（如 `1040-1043`）
-- 支持自定义速率（`1mbit` / `512kbit` / `10mbit` 等）
-- 自动检测默认网卡，应用前二次确认
+| 功能 | 说明 |
+|:-----|:-----|
+| 3X-UI 面板 | Xray-core 多协议 Web 面板 |
+| Clash for Linux | 基于 Clash 的代理客户端 |
+| Hysteria2 (HY2) | 高速 UDP 代理协议 |
+| Shadowsocks-rust | 经典 SS (Rust 高性能版) |
+| Trojan-Go | Trojan 协议 Go 实现 |
+| Cloudflare WARP | WARP CLI + WGCF 部署管理 |
+| WireGuard | 原生安装 + 自动生成密钥 |
+| wg-easy | Docker Web 面板管理 WireGuard |
 
 ---
 

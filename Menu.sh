@@ -321,6 +321,275 @@ install_3xui() {
     bash <(curl -sL "https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh")
 }
 
+# ---- BBR 加速 ----
+install_bbr() {
+    echo -e "\n  ${BOLD}BBR 网络加速${NC}"
+    echo -e "  ${GREEN}  [1]${NC} 开启原生 BBR (内核>=4.9)"
+    echo -e "  ${GREEN}  [2]${NC} 安装 BBR3 + FQ (推荐,高吞吐)"
+    echo -e "  ${GREEN}  [3]${NC} 安装 BBR + Cake (低延迟)"
+    echo -e "  ${GREEN}  [4]${NC} 查看当前拥塞控制算法"
+    echo -ne "  ${BOLD}请选择${NC} > "; read BB
+    case "$BB" in
+        1)
+            echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
+            echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
+            sysctl -p
+            print_done "BBR 已开启" ;;
+        2)
+            modprobe tcp_bbr 2>/dev/null || true
+            echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
+            echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
+            sysctl -p
+            print_done "BBR + FQ 已配置"
+            echo -e "  验证: ${CYAN}sysctl net.ipv4.tcp_congestion_control${NC}" ;;
+        3)
+            modprobe tcp_bbr 2>/dev/null || true
+            echo "net.core.default_qdisc=cake" >> /etc/sysctl.conf
+            echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
+            sysctl -p
+            print_done "BBR + Cake 已配置" ;;
+        4)
+            echo -e "  当前算法: ${GREEN}$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')${NC}"
+            echo -e "  可用算法: ${GREEN}$(sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | awk '{print $3}')${NC}" ;;
+        *) echo -e "  ${RED}无效选项${NC}" ;;
+    esac
+}
+
+# ---- BBR3/BBRPlus 多合一 (ylx2016) ----
+install_bbrplus() {
+    echo -e "\n  ${BOLD}正在安装 BBRPlus/BBR2/BBR3 多合一...${NC}"
+    wget -O /tmp/tcpx.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcpx.sh" 2>/dev/null
+    chmod +x /tmp/tcpx.sh
+    bash /tmp/tcpx.sh
+    rm -f /tmp/tcpx.sh
+}
+
+# ---- Swap 管理 ----
+manage_swap() {
+    echo -e "\n  ${BOLD}Swap 管理${NC}"
+    echo -e "  当前 Swap: ${GREEN}$(free -m | awk '/Swap:/{print $2"MB 已用:"$3"MB"}')${NC}"
+    echo ""
+    echo -e "  ${GREEN}  [1]${NC} 添加 Swap (交互式输入大小)"
+    echo -e "  ${GREEN}  [2]${NC} 一键添加 1G Swap"
+    echo -e "  ${GREEN}  [3]${NC} 一键添加 2G Swap"
+    echo -e "  ${GREEN}  [4]${NC} 安装 Zram (内存压缩,小内存VPS推荐)"
+    echo -e "  ${GREEN}  [5]${NC} 关闭并删除 Swap"
+    echo -ne "  ${BOLD}请选择${NC} > "; read SW
+    case "$SW" in
+        1)
+            read -p "  请输入 Swap 大小 (MB): " SW_SIZE
+            [ -z "$SW_SIZE" ] && SW_SIZE=1024
+            swapoff /swapfile 2>/dev/null; rm -f /swapfile
+            dd if=/dev/zero of=/swapfile bs=1M count=$SW_SIZE 2>/dev/null
+            chmod 600 /swapfile; mkswap /swapfile; swapon /swapfile
+            echo '/swapfile none swap sw 0 0' >> /etc/fstab
+            print_done "Swap 添加 (${SW_SIZE}MB)" ;;
+        2) swapoff /swapfile 2>/dev/null; rm -f /swapfile
+           dd if=/dev/zero of=/swapfile bs=1M count=1024 2>/dev/null
+           chmod 600 /swapfile; mkswap /swapfile; swapon /swapfile
+           echo '/swapfile none swap sw 0 0' >> /etc/fstab
+           print_done "1G Swap 已添加" ;;
+        3) swapoff /swapfile 2>/dev/null; rm -f /swapfile
+           dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null
+           chmod 600 /swapfile; mkswap /swapfile; swapon /swapfile
+           echo '/swapfile none swap sw 0 0' >> /etc/fstab
+           print_done "2G Swap 已添加" ;;
+        4)
+            apt install -y zram-tools 2>/dev/null || true
+            cat > /etc/default/zramswap << 'ZRAMEOF'
+ALGO=zstd
+PERCENT=50
+PRIORITY=100
+ZRAMEOF
+            systemctl restart zramswap 2>/dev/null || true
+            print_done "Zram 已启用 (50%内存)" ;;
+        5) swapoff /swapfile 2>/dev/null; rm -f /swapfile
+           sed -i '/\/swapfile/d' /etc/fstab 2>/dev/null
+           print_done "Swap 已删除" ;;
+        *) echo -e "  ${RED}无效选项${NC}" ;;
+    esac
+}
+
+# ---- Fail2ban 防爆破 ----
+install_fail2ban() {
+    echo -e "\n  ${BOLD}正在安装 Fail2ban...${NC}"
+    apt install -y fail2ban 2>/dev/null || yum install -y fail2ban 2>/dev/null || true
+    cat > /etc/fail2ban/jail.local << 'F2BEOF'
+[DEFAULT]
+bantime = 3600
+findtime = 600
+maxretry = 5
+ignoreip = 127.0.0.1/8
+
+[sshd]
+enabled = true
+port = ssh
+logpath = %(sshd_log)s
+maxretry = 3
+bantime = 86400
+F2BEOF
+    systemctl enable fail2ban --now 2>/dev/null || service fail2ban start 2>/dev/null || true
+    print_done "Fail2ban 安装完成"
+    echo -e "  封禁时间: 24小时 | 最大重试: 3次"
+    echo -e "  查看状态: ${CYAN}fail2ban-client status sshd${NC}"
+}
+
+# ---- DD 系统重装 ----
+install_dd_reinstall() {
+    echo -e "\n  ${BOLD}${RED}⚠ DD 重装将清除服务器所有数据！${NC}"
+    echo -e "  ${YELLOW}推荐使用 bin456789/reinstall (支持19种系统)${NC}"
+    echo ""
+    echo -e "  ${GREEN}  [1]${NC} DD 重装 Debian 12"
+    echo -e "  ${GREEN}  [2]${NC} DD 重装 Ubuntu 22.04"
+    echo -e "  ${GREEN}  [3]${NC} DD 重装 AlmaLinux 9"
+    echo -e "  ${GREEN}  [4]${NC} DD 重装 Windows Server 2022"
+    echo -e "  ${GREEN}  [5]${NC} 仅查看 bin456789 脚本用法"
+    echo -ne "  ${BOLD}请选择${NC} > "; read DD
+    case "$DD" in
+        1) echo -e "  ${RED}即将重装为 Debian 12，请确认！${NC}"
+           read -p "  输入 YES 确认: " YN; [ "$YN" = "YES" ] || return
+           bash <(curl -sSL https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh) debian 12 ;;
+        2) echo -e "  ${RED}即将重装为 Ubuntu 22.04，请确认！${NC}"
+           read -p "  输入 YES 确认: " YN; [ "$YN" = "YES" ] || return
+           bash <(curl -sSL https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh) ubuntu 22.04 ;;
+        3) echo -e "  ${RED}即将重装为 AlmaLinux 9，请确认！${NC}"
+           read -p "  输入 YES 确认: " YN; [ "$YN" = "YES" ] || return
+           bash <(curl -sSL https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh) almalinux 9 ;;
+        4) echo -e "  ${RED}即将重装为 Windows，请确认！${NC}"
+           read -p "  输入 YES 确认: " YN; [ "$YN" = "YES" ] || return
+           bash <(curl -sSL https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh) windows ;;
+        5) echo -e "  ${CYAN}项目地址: https://github.com/bin456789/reinstall${NC}"
+           echo -e "  用法: bash reinstall.sh <系统> <版本>" ;;
+        *) echo -e "  ${RED}无效选项${NC}" ;;
+    esac
+}
+
+# ---- ACME 免费 SSL 证书 ----
+install_acme() {
+    echo -e "\n  ${BOLD}ACME 免费 SSL 证书管理${NC}"
+    if ! command -v acme.sh &>/dev/null; then
+        echo -e "  正在安装 acme.sh..."
+        curl https://get.acme.sh | sh
+        source ~/.bashrc 2>/dev/null || true
+    fi
+    echo ""
+    echo -e "  ${GREEN}  [1]${NC} 签发证书 (HTTP验证, 需要80端口开放)"
+    echo -e "  ${GREEN}  [2]${NC} 签发证书 (DNS验证, 需要API Key)"
+    echo -e "  ${GREEN}  [3]${NC} 查看已签发证书"
+    echo -e "  ${GREEN}  [4]${NC} 续期所有证书"
+    echo -ne "  ${BOLD}请选择${NC} > "; read AC
+    case "$AC" in
+        1) read -p "  请输入域名: " ACME_DOMAIN
+           read -p "  请输入邮箱: " ACME_EMAIL
+           ~/.acme.sh/acme.sh --issue -d "$ACME_DOMAIN" --nginx 2>/dev/null || \
+           ~/.acme.sh/acme.sh --issue -d "$ACME_DOMAIN" --standalone
+           print_done "证书签发完成" ;;
+        2) read -p "  请输入域名: " ACME_DOMAIN
+           echo -e "  支持的DNS API: ${CYAN}cf/ali/dp/gd${NC}"
+           read -p "  请输入DNS提供商: " ACME_DNS
+           read -p "  请输入API Key/Token: " ACME_KEY
+           ~/.acme.sh/acme.sh --issue --dns "dns_${ACME_DNS}" -d "$ACME_DOMAIN"
+           print_done "DNS验证证书签发完成" ;;
+        3) ~/.acme.sh/acme.sh --list ;;
+        4) ~/.acme.sh/acme.sh --cron --home ~/.acme.sh && print_done "续期完成" ;;
+        *) echo -e "  ${RED}无效选项${NC}" ;;
+    esac
+}
+
+# ---- Aria2 下载器 ----
+install_aria2() {
+    echo -e "\n  ${BOLD}正在安装 Aria2...${NC}"
+    apt install -y aria2 2>/dev/null || yum install -y aria2 2>/dev/null || true
+    mkdir -p /etc/aria2 /opt/aria2/downloads
+    cat > /etc/aria2/aria2.conf << 'ARIAEOF'
+dir=/opt/aria2/downloads
+enable-rpc=true
+rpc-listen-port=6800
+rpc-secret=pikash_aria2
+max-concurrent-downloads=5
+max-connection-per-server=16
+split=16
+continue=true
+file-allocation=falloc
+ARIAEOF
+    cat > /etc/systemd/system/aria2.service << 'ARIA2EOF'
+[Unit]
+Description=Aria2 Download Manager
+After=network.target
+[Service]
+ExecStart=/usr/bin/aria2c --conf-path=/etc/aria2/aria2.conf
+Restart=always
+[Install]
+WantedBy=multi-user.target
+ARIA2EOF
+    systemctl daemon-reload; systemctl enable aria2 --now 2>/dev/null
+    print_done "Aria2 安装完成"
+    echo -e "  RPC 端口: ${CYAN}6800${NC} | 密钥: ${CYAN}pikash_aria2${NC}"
+    echo -e "  下载目录: ${CYAN}/opt/aria2/downloads${NC}"
+}
+
+# ---- 服务器监控 (Netdata) ----
+install_netdata() {
+    echo -e "\n  ${BOLD}正在安装 Netdata 监控...${NC}"
+    echo -e "  ${GREEN}  [1]${NC} Netdata (实时监控,功能全面)"
+    echo -e "  ${GREEN}  [2]${NC} Cockpit (Web 管理面板,轻量)"
+    echo -e "  ${GREEN}  [3]${NC} Glances (命令行监控)"
+    echo -ne "  ${BOLD}请选择${NC} > "; read MN
+    case "$MN" in
+        1) bash <(curl -sSL https://my-netdata.io/kickstart.sh) --stable-channel ;;
+        2) apt install -y cockpit 2>/dev/null || yum install -y cockpit 2>/dev/null || true
+           systemctl enable cockpit --now 2>/dev/null || true
+           print_done "Cockpit 已安装"
+           echo -e "  访问: ${CYAN}https://$(curl -s ifconfig.me 2>/dev/null):9090${NC}" ;;
+        3) apt install -y glances 2>/dev/null || pip install glances 2>/dev/null || true
+           print_done "Glances 已安装"
+           echo -e "  运行: ${CYAN}glances${NC}" ;;
+        *) echo -e "  ${RED}无效选项${NC}" ;;
+    esac
+}
+
+# ---- UFW 防火墙 ----
+setup_ufw() {
+    echo -e "\n  ${BOLD}UFW 防火墙配置${NC}"
+    apt install -y ufw 2>/dev/null || true
+    echo -e "  ${GREEN}  [1]${NC} 默认安全规则 (允许SSH/80/443)"
+    echo -e "  ${GREEN}  [2]${NC} 交互式添加端口"
+    echo -e "  ${GREEN}  [3]${NC} 查看状态"
+    echo -e "  ${GREEN}  [4]${NC} 启用/禁用防火墙"
+    echo -ne "  ${BOLD}请选择${NC} > "; read UF
+    case "$UF" in
+        1) ufw default deny incoming; ufw default allow outgoing
+           ufw allow ssh; ufw allow 80/tcp; ufw allow 443/tcp
+           ufw --force enable; print_done "UFW 默认规则已应用" ;;
+        2) read -p "  请输入端口 (如 8080/tcp): " UFW_PORT
+           ufw allow "$UFW_PORT"; print_done "端口 ${UFW_PORT} 已放行" ;;
+        3) ufw status numbered ;;
+        4) echo -ne "  [e]启用 [d]禁用 > "; read UF2
+           case "$UF2" in e) ufw --force enable ;; d) ufw disable ;; esac ;;
+        *) echo -e "  ${RED}无效选项${NC}" ;;
+    esac
+}
+
+# ---- TCP 优化 ----
+tcp_optimize() {
+    echo -e "\n  ${BOLD}TCP 网络优化${NC}"
+    cat >> /etc/sysctl.conf << 'TCPEOF'
+
+# TCP 优化
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_mtu_probing = 1
+net.ipv4.tcp_rmem = 4096 87380 16777216
+net.ipv4.tcp_wmem = 4096 65536 16777216
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.core.netdev_max_backlog = 5000
+net.ipv4.tcp_max_syn_backlog = 8192
+TCPEOF
+    sysctl -p
+    print_done "TCP 优化已应用"
+}
+
 # ============================================================
 # 子菜单 1: 一键部署
 # ============================================================
@@ -331,20 +600,21 @@ sub_deploy() {
     print_section "系统环境"
     print_item "1"  "更换大陆镜像源"           "Debian(Ubuntu)USTC / CentOS(Aliyun)"
     print_item "2"  "系统更新 + 基础工具"       "curl/wget/git/htop/vim/unzip"
-    print_item "3"  "安装 Docker + 镜像加速"    "1ms.run 国内镜像源"
-    print_item "4"  "安装 Podman + 镜像加速"    "1ms.run 国内镜像源"
+    print_item "3"  "配置代理 (ProxyChains4)"   "SOCKS5 代理链，加速GitHub下载"
+    print_item "4"  "安装 Docker + 镜像加速"    "1ms.run 国内镜像源"
+    print_item "5"  "安装 Podman + 镜像加速"    "1ms.run 国内镜像源"
     print_section "面板安装"
-    print_item "5"  "安装宝塔面板"              "经典 Linux 面板"
-    print_item "6"  "安装 1Panel"               "现代化开源面板"
-    print_item "7"  "安装 FRP Panel"            "内网穿透面板 (PM2)"
-    print_item "8"  "安装 NetPanel"             "轻量服务器管理面板"
-    print_item "9"  "安装哪吒探针"              "Agent 自动注册"
-    print_item "10" "安装 Node.js LTS + PM2"    "NVM + npmmirror 源"
+    print_item "6"  "安装宝塔面板"              "经典 Linux 面板"
+    print_item "7"  "安装 1Panel"               "现代化开源面板"
+    print_item "8"  "安装 FRP Panel"            "内网穿透面板 (PM2)"
+    print_item "9"  "安装 NetPanel"             "轻量服务器管理面板"
+    print_item "10" "安装哪吒探针"              "Agent 自动注册"
+    print_item "11" "安装 Node.js LTS + PM2"    "NVM + npmmirror 源"
     print_section "组网与中转"
-    print_item "11" "安装 EasyTier"             "去中心化 P2P 组网"
-    print_item "12" "安装 RustDesk 中转"        "远程桌面中继服务器"
-    print_item "13" "安装 ZeroTier"             "虚拟局域网组网"
-    print_item "14" "安装 Tailscale"            "WireGuard 组网"
+    print_item "12" "安装 EasyTier"             "去中心化 P2P 组网"
+    print_item "13" "安装 RustDesk 中转"        "远程桌面中继服务器"
+    print_item "14" "安装 ZeroTier"             "虚拟局域网组网"
+    print_item "15" "安装 Tailscale"            "WireGuard 组网"
     print_line
     print_item "A"  "全部部署（依次询问）"      ""
     print_item "0"  "返回主菜单"                ""
@@ -355,22 +625,23 @@ sub_deploy() {
 exec_deploy() {
     case "$1" in
         1)  switch_apt_mirror ;;
-        2)  run_setup 1 ;;
-        3)  install_docker ;;
-        4)  install_podman ;;
-        5)  run_setup 4 ;;
-        6)  install_1panel ;;
-        7)  run_setup 8 ;;
-        8)  install_netpanel ;;
-        9)  run_setup 5 ;;
-        10) run_setup 3 ;;
-        11) run_setup 7 ;;
-        12) run_setup A ;;
-        13) run_setup B ;;
-        14) run_setup C ;;
+        2)  run_setup 1 ;;       # 系统更新
+        3)  run_setup P ;;       # 代理配置
+        4)  install_docker ;;
+        5)  install_podman ;;
+        6)  run_setup 4 ;;       # 宝塔
+        7)  install_1panel ;;
+        8)  run_setup 8 ;;       # FRP Panel
+        9)  install_netpanel ;;
+        10) run_setup 5 ;;       # 哪吒
+        11) run_setup 3 ;;       # Node.js
+        12) run_setup 7 ;;       # EasyTier
+        13) run_setup A ;;       # RustDesk
+        14) run_setup B ;;       # ZeroTier
+        15) run_setup C ;;       # Tailscale
         A|a) run_setup ALL ;;
         0)  return 1 ;;
-        *)  echo -e "  ${RED}无效: $1${NC}" ;;
+        *)  echo -e "  ${RED}无效: $1${NC}" ;; 
     esac; return 0
 }
 
@@ -381,10 +652,29 @@ sub_maintain() {
     clear_screen; print_header
     echo -e "  ${BOLD}${CYAN}  ◀ 主菜单                          [2] 日常维护 ▶${NC}"
     print_line
+
+    print_section "系统优化"
     print_item "1"  "系统垃圾清理"              "apt缓存/journal/Docker/bash历史"
-    print_item "2"  "端口限速"                  "tc+IFB 双向限速(自定义端口/速率)"
-    print_item "3"  "屏蔽地区 (BlockAreaBot)"   "一键屏蔽指定国家/地区 IP"
-    print_item "4"  "升级/替换内核"             "XanMod/Liquorix/Backports/HWE"
+    print_item "2"  "Swap 管理"                 "添加/删除/Zram 虚拟内存"
+    print_item "3"  "BBR 网络加速"              "原生BBR/BBR3+FQ/BBR+Cake"
+    print_item "4"  "BBRPlus/BBR2/BBR3 多合一" "ylx2016 多版本BBR一键安装"
+    print_item "5"  "TCP 网络优化"              "TCP FastOpen/缓冲/backlog"
+
+    print_section "安全防护"
+    print_item "6"  "UFW 防火墙"                "一键配置/端口管理/状态查看"
+    print_item "7"  "Fail2ban 防爆破"           "SSH 防暴力破解 24h封禁"
+    print_item "8"  "屏蔽地区 (BlockAreaBot)"   "一键屏蔽指定国家/地区 IP"
+
+    print_section "系统管理"
+    print_item "9"  "端口限速"                  "tc+IFB 双向限速(自定义端口/速率)"
+    print_item "10" "升级/替换内核"             "XanMod/Liquorix/Backports/HWE"
+    print_item "11" "DD 系统重装"               "一键重装Debian/Ubuntu/Win(bin456789)"
+
+    print_section "常用工具"
+    print_item "12" "ACME 免费SSL证书"          "自动签发/续期 Let's Encrypt"
+    print_item "13" "Aria2 下载器"              "离线下载+RPC(端口6800)"
+    print_item "14" "服务器监控"                "Netdata/Cockpit/Glances"
+
     print_line
     print_item "0"  "返回主菜单"                ""
     print_line
@@ -394,9 +684,19 @@ sub_maintain() {
 exec_maintain() {
     case "$1" in
         1) run_clean ;;
-        2) run_setup 9 ;;
-        3) block_area_bot ;;
-        4) upgrade_kernel ;;
+        2) manage_swap ;;
+        3) install_bbr ;;
+        4) install_bbrplus ;;
+        5) tcp_optimize ;;
+        6) setup_ufw ;;
+        7) install_fail2ban ;;
+        8) block_area_bot ;;
+        9) run_setup 9 ;;
+        10) upgrade_kernel ;;
+        11) install_dd_reinstall ;;
+        12) install_acme ;;
+        13) install_aria2 ;;
+        14) install_netdata ;;
         0) return 1 ;;
         *) echo -e "  ${RED}无效: $1${NC}" ;;
     esac; return 0
