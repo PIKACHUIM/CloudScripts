@@ -5,10 +5,10 @@
 #  支持交互式菜单和命令行参数两种模式
 #
 #  使用方式:
-#    交互式:  bash Menu.sh
-#    直接执行: bash Menu.sh <编号>
-#    Linux:   bash <(curl -s https://gh-bat.pika.net.cn/Menu.sh)
-#    Win Git: curl -s https://gh-bat.pika.net.cn/Menu.sh | bash
+#    交互式:    bash Menu.sh
+#    直接执行:  bash Menu.sh <编号>
+#    远程一键:  bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
+#    国内加速:  bash <(curl -s https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
 # ============================================================
 
 set -e
@@ -24,7 +24,23 @@ BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # ---- CDN 基础地址 ----
-CDN_BASE="https://gh-bat.pika.net.cn"
+# 直连地址 (GitHub Raw)
+CDN_RAW="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
+# 加速地址 (国内镜像)
+CDN_MIRROR="https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
+
+# 自动测速选择最快的CDN
+_choose_cdn() {
+    # 优先直连，超时则切镜像
+    if curl -s --connect-timeout 3 --max-time 5 "${CDN_RAW}/Menu.sh" > /dev/null 2>&1; then
+        echo "$CDN_RAW"
+    elif curl -s --connect-timeout 3 --max-time 5 "${CDN_MIRROR}/Menu.sh" > /dev/null 2>&1; then
+        echo "$CDN_MIRROR"
+    else
+        echo "$CDN_RAW"  # 回退
+    fi
+}
+CDN_BASE=$(_choose_cdn)
 
 # ---- 系统检测 ----
 detect_os() {

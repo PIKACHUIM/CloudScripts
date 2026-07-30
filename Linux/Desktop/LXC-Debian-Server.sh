@@ -1,4 +1,10 @@
 #!/bin/bash
+# LXC-Debian-Server.sh - 基础服务环境安装
+# 此脚本安装 SSH、Docker、用户管理等基础服务
+# 安装完成后可继续安装:
+#   - DockerClouds 管理平台: curl .../LXC-Debian-DockerClouds.sh | bash -e
+#   - X11 图形环境:          curl .../LXC-Debian-Graphy.sh | bash -e
+
 # Check -----------------------------------------------------------
 file="/etc/lxc-de-flag"
 set -e
@@ -29,7 +35,17 @@ touch /run.sh && chmod +x /run.sh
 groupadd -r -g 2000 user &&  useradd -u 2000 -m -r -g user user
 echo "user ALL=(ALL)      ALL" >> /etc/sudoers
 
-# Init ---------------------------------------------------------------------------------------------
+# Docker CE 安装 (DockerClouds 平台依赖) -----------------------------------------------------------
+echo "安装 Docker CE (DockerClouds 运行时依赖)....."
+curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt update && DEBIAN_FRONTEND=noninteractive apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin || \
+echo "Docker CE 安装失败（可能在不支持 Docker 的 LXC 环境），跳过"
+
+# 允许非 root 用户使用 Docker
+usermod -aG docker user 2>/dev/null || true
+
+# Init Systemd Service -----------------------------------------------------------------------------
 cat > /etc/systemd/system/run.service <<'EOF'
 [Unit]
 Description=Pikachu Docker Run Script
@@ -47,9 +63,14 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 WantedBy=multi-user.target
 EOF
 
-# Init ---------------------------------------------------------------------------------------------
+# Init Script --------------------------------------------------------------------------------------
 echo "#!/bin/bash"                               > /run.sh
 echo 'echo Starting Basic Server ------------'  >> /run.sh
 echo 'nohup /usr/sbin/sshd -D &'                >> /run.sh
 systemctl enable run && systemctl start run
 echo 0 > /etc/lxc-de-flag
+
+echo "============================================"
+echo "  基础服务环境安装完成"
+echo "  DockerClouds 安装: curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-DockerClouds.sh | bash -e"
+echo "============================================"

@@ -1,163 +1,264 @@
-# 皮卡在线脚本托管平台
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-blue?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/License-GPL%20%7C%20MIT-green?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/Shell-Bash%20%7C%20PowerShell-orange?style=flat-square" alt="Shell">
+</p>
 
-## Linux脚本
+<h1 align="center">⚡ 皮卡在线脚本托管平台</h1>
+<p align="center"><strong>Pika Online Script Hosting Platform</strong></p>
 
-### 服务器安装脚本
+<p align="center">
+  一键部署 · 性能测评 · 网络诊断 · 桌面环境 · 容器引擎
+</p>
 
+<p align="center">
+  <a href="https://github.com/PIKACHUIM/CloudScripts"><b>📦 项目地址</b></a> &nbsp;|&nbsp;
+  <a href="https://github.524228.xyz/PIKACHUIM/CloudScripts"><b>🚀 国内加速</b></a>
+</p>
 
-#### NAT VPS服务自动构建
+---
 
-一键部署服务器环境的交互式脚本，敏感信息使用 AES-256-CBC 加密存储，运行时需输入部署密码。
+## 🚀 快速开始
 
-```shell
-bash <(curl https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh)
+一行命令启动总菜单，自动识别系统并展示对应功能：
+
+```bash
+bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
 ```
 
-脚本包含以下可选模块（运行时按需选择）：
+> 🌐 **国内加速**（镜像地址，下载更快）：
+> ```bash
+> bash <(curl -s https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
+> ```
+
+### 菜单一览
+
+| 类别 | 编号 | 功能 |
+|:-----|:----:|:-----|
+| 🖥️ 服务器部署 | 1-4 | VPS 一键部署、系统清理、3X-UI 面板、端口限速 |
+| 🎨 桌面环境 | 10-17 | Debian LXC 容器 8 种桌面一键安装 |
+| 📊 性能测评 | 20-27 | 融合怪/IP质量/LemonBench/YABS/UnixBench 等 8 款工具 |
+| 🌐 网络诊断 | 30-34 | 回程路由/全国Ping/Speedtest 等 5 款工具 |
+| 🪟 Windows | - | Docker CE · Mirantis · nerdctl · MAS 激活 |
+
+> 也可直接输入对应编号跳转：`bash Menu.sh 20` 直接运行融合怪测评。
+
+---
+
+## 📦 功能详解
+
+### 🖥️ 服务器部署与管理
+
+#### VPS 一键部署 `Menu → 1`
+
+交互式部署脚本，覆盖一台新 VPS 从零到可用的全部步骤。敏感信息使用 **AES-256-CBC + PBKDF2** 加密存储，运行时输入密码解密。
+
+<details>
+<summary>📋 包含模块（点击展开）</summary>
 
 | 模块 | 说明 |
-| --- | --- |
-| 系统初始化 | 更新系统、安装 curl/wget/nano/git/htop 等常用工具 |
-| ProxyChains4 | 配置 SOCKS5 代理链，用于后续下载加速 |
-| Node.js (LTS) | 通过 NVM 安装 Node.js LTS 版本，配置 npmmirror 源并安装 PM2 |
-| 宝塔面板 | 自动安装宝塔面板并配置用户名、密码和端口 |
-| 哪吒探针 | 安装哪吒监控 Agent 并自动注册到服务端 |
-| 3X-UI 面板 | 安装 3X-UI 面板，自动生成自签名 TLS 证书 |
-| EasyTier | 从 GitHub 获取最新版本，部署 EasyTier 组网服务（PM2 托管） |
+|:-----|:-----|
+| 系统初始化 | 更新系统、安装 curl/wget/nano/git/htop/vim 等常用工具 |
+| ProxyChains4 | 配置 SOCKS5 代理链，加速 GitHub 资源下载 |
+| Node.js LTS | 通过 NVM 安装，配置 npmmirror 源 + PM2 进程管理 |
+| 宝塔面板 | 自动安装并配置用户名、密码、面板端口 |
+| 哪吒探针 | 安装 Agent 并自动注册到服务端 |
+| 3X-UI 面板 | 安装 Xray-core 多协议代理面板，自动生成 TLS 证书 |
+| EasyTier | 获取最新版部署组网服务（PM2 托管） |
 | FRP Panel | 安装 frp-panel 客户端/服务端节点（PM2 托管） |
-| 端口限速 | 使用 tc + IFB 对指定端口进行双向流量限速 |
+| 端口限速 | tc+IFB 双向流量限速，支持端口范围和自定义速率 |
 
-### 服务器测评脚本
+</details>
 
-| 脚本            | 简介                                                         | 使用命令                                                     |
-| --------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| BackTrace       | 三网回程路由测试                                             | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/back-trace.sh)` |
-| ECSScript       | 融合怪测评脚本                                               | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/ecss-bench.sh)` |
-| UnixBench.sh    | 一个类unix系统下的性能测试工具                               | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/unix-bench.sh)` |
-| Bench.sh        | 秋水逸冰大佬的写的Bench.sh脚本                               | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/qsyb-bench.sh)` |
-| SuperSpeed      | 使用全国各地三大运营的 speedtest 测速节点进行全面测速        | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/superspeed.sh)` |
-| SuperBench.sh   | 老鬼大佬的SuperBench测试脚本                                 | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/superbench.sh)` |
-| SuperTrace.sh   | 老鬼大佬的SuperTrace测试脚本                                 | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/supertrace.sh)` |
-| LemonBench.sh   | 一款针对Linux服务器设计的服务器性能测试工具                  | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/lemonbench.sh)` |
-| yabs.sh         | 一款跨平台的处理基准测试程序                                 | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/yabs-bench.sh)` |
-| besttrace4linux | 回程路由测试，[http://-IPIP.net](https://link.zhihu.com/?target=http%3A//-IPIP.net)出品 | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/best-trace.sh)` |
-| Speedtest-Cli   | 国外大佬Sivel作品                                            | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/speed-test.py)` |
-| PrettyPing.sh   | 基本用途相当于 ping 命令 附带了更美观精细地彩色图示          | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/prettyping.sh)` |
-| mPing.sh        | 方便测试回程Ping值 目前支持众多区域和各大运营商              | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/mping-test.sh)` |
-| IP-Quality.sh   | IP质量检测，整合多数据库风险评分与流媒体/邮件连通性检测      | `bash <(wget -qO- gh-bat.pika.net.cn/Linux/VPSTest/ip-quality.sh)` |
-
-### 清理Linux 垃圾
-
-```shell
-apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Cleaner/LinuxClean.sh | bash
+```bash
+# 生成加密凭据（仅需运行一次）
+bash Linux/VPSSets/Vault.sh
 ```
 
-### 安装图形化桌面
+#### 系统清理 `Menu → 2`
 
-- #### Debian 桌面安装
-
-  1. 更换APT软件镜像源：
-
-  ```shell
-  sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources
-  sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
-  apt update && apt upgrade
-  ```
-  
-  2. 按下表选择对应命令：
-
-  
-  | 桌面/环境 | 简介 | 使用命令 |
-  | --------- | ---- | -------- |
-  | Server 基础环境 | 初始化系统与常用依赖，准备图形/桌面安装 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e` |
-  | X11 图形栈 | 安装 X11 与基础图形组件，为桌面打底 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e` |
-  | Deepin/GXDE 桌面 | 中文友好、易用美观的 Deepin 风格桌面（GXDE） | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Deepin.sh | bash -e` |
-  | KDE Plasma 桌面 | 高度可定制、功能全面的现代桌面 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Plasma.sh | bash -e` |
-  | KDE Lingmo 桌面 | KDE 的国风变体，界面现代、整合优化 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Lingmo.sh | bash -e` |
-  | Xfce 轻量桌面 | 资源占用低、稳定流畅，适合轻量环境 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Xfce4L.sh | bash -e` |
-  | GNOME 3 桌面 | 简洁现代、工作流导向的桌面体验 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Gnome3.sh | bash -e` |
-  | MATE 经典桌面 | 传统菜单与窗口风格，稳定耐用 | `curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-MateDE.sh | bash -e` |
-  
-    
-
-## WinNT脚本
-
-### 1. Docker CE引擎
-
-```PowerShell
-irm https://gh-bat.pika.net.cn/WinNT/Docker/Winx86-dockerce.ps1 | iex
+```bash
+curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Cleaner/LinuxClean.sh | bash
 ```
 
-- #### 默认HyperV Runtime
+清理 bash 历史、apt 缓存、journal 日志、Docker 垃圾、缩略图缓存、崩溃日志和临时文件。
 
-  - 需要在BIOS中打开VT-D和VT-X
-  - 需要在[启用或关闭Windows功能]里面启用Hyper-V
+#### 3X-UI 面板 `Menu → 3`
 
-- #### 切换Native Runtime
+Xray-core 多协议代理管理面板，支持 VMess / VLESS / Trojan / Shadowsocks。
 
-  - 优点：无需VT虚拟化，性能损失小
-  - 缺点：只支持Windows原生容器
+#### 端口限速 `Menu → 4`
 
+使用 `tc` + `IFB` 对指定端口进行出入双向流量限速：
+- 支持单个端口、多端口、端口范围（如 `1040-1043`）
+- 支持自定义速率（`1mbit` / `512kbit` / `10mbit` 等）
+- 自动检测默认网卡，应用前二次确认
 
-```PowerShell
-& $Env:ProgramFiles\Docker\Docker\DockerCli.exe -SwitchDaemon .
+---
+
+### 🎨 桌面环境安装 (Debian LXC)
+
+> ⚠️ **安装顺序**：先装 Server 基础环境 → X11 图形栈 → 再选装桌面
+
+| 编号 | 桌面环境 | 特点 |
+|:----:|:---------|:-----|
+| 10 | **Server 基础环境** | 🔧 换 USTC 源、SSH、sudo/vim/git 等基础工具 |
+| 11 | **X11 图形栈** | 🖼️ Xserver + NoMachine 远程桌面 |
+| 12 | **Deepin / GXDE** | 🎯 中文友好、美观的 Deepin 风格 |
+| 13 | **KDE Plasma** | ✨ 高度可定制、功能全面的现代桌面 |
+| 14 | **KDE Lingmo** | 🏮 KDE 国风变体 |
+| 15 | **Xfce 轻量** | 🪶 资源占用低、稳定流畅 |
+| 16 | **GNOME 3** | 🧩 简洁现代、工作流导向 |
+| 17 | **MATE 经典** | 🏛️ 传统菜单风格、稳定耐用 |
+
+<details>
+<summary>📝 手动安装命令（点击展开）</summary>
+
+```bash
+# 1. 换源（Debian）
+sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources
+sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
+apt update && apt upgrade
+
+# 2. 基础环境
+curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Desktop/LXC-Debian-Server.sh | bash -e
+
+# 3. 图形栈
+curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
+
+# 4. 选择桌面（示例：Deepin）
+curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Desktop/LXC-Debian-Deepin.sh | bash -e
 ```
 
-### Nerdctl 引擎
+</details>
 
-*命令完成后会自动重启，请提前保存好未保存的文件！！！*
+> 安装状态通过 `/etc/lxc-de-flag` 追踪，防止重复安装。
 
-```PowerShell
-irm https://gh-bat.pika.net.cn/WinNT/Docker/Winx86-nerdctls.ps1 | iex
-```
+---
 
-- #### 优化操作
+### 📊 性能测评
 
-##### 1. 修改名称
+| 编号 | 工具 | 简介 | 作者 |
+|:----:|:-----|:-----|:-----|
+| 20 | **融合怪 综合测评** | CPU/内存/磁盘/网络/流媒体全面检测 | spiritLHLS |
+| 21 | **IP 质量体检** | 多数据库风险评分 + 流媒体 + 邮局连通性 | - |
+| 22 | **LemonBench** | CPU/内存/磁盘/网络 基准测试 | iLemonrain |
+| 23 | **YABS** | iperf3 + Geekbench + fio 跨平台测试 | Mason Rowe |
+| 24 | **UnixBench** | 类Unix系统综合性能跑分 | Teddysun |
+| 25 | **Bench.sh** | 系统信息 + IO + 网速基准 | 秋水逸冰 |
+| 26 | **SuperBench** | 系统信息 + IO + 全国测速 | Oldking |
+| 27 | **SuperSpeed** | 全国三网 Speedtest 全面测速 | - |
 
-优化后可以直接使用`docker`命令进行管理
+---
 
-```PowerShell
+### 🌐 网络诊断
+
+| 编号 | 工具 | 简介 | 作者 |
+|:----:|:-----|:-----|:-----|
+| 30 | **BackTrace** | 三网回程路由自动测试 | - |
+| 31 | **SuperTrace** | 北上广三大运营商路由追踪 | Oldking |
+| 32 | **BestTrace** | IPIP.net 交互式路由追踪 | IPIP.net |
+| 33 | **mPing** | 全国多地域 Ping 测试 | xiaoz.me |
+| 34 | **PrettyPing** | 彩色图形化 Ping 输出 | Denilson Figueiredo |
+
+---
+
+## 🪟 Windows 脚本
+
+> Windows 脚本需在 **PowerShell（管理员）** 中运行。
+> 在 Git Bash / MSYS2 中运行 Menu.sh 将自动显示对应的 PowerShell 命令。
+
+### Docker / 容器引擎
+
+| 工具 | 特点 | 命令 |
+|:-----|:-----|:-----|
+| **Docker CE** | Hyper-V / Native 双运行时可选 | `irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/Docker/Winx86-dockerce.ps1 \| iex` |
+| **Mirantis 容器运行时** | Docker CE 替代方案 | `irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/Docker/Winx86-mirantis.ps1 \| iex` |
+| **containerd + nerdctl** | 轻量容器方案（无需 Docker daemon） | `irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/Docker/Winx86-nerdctls.ps1 \| iex` |
+
+<details>
+<summary>⚙️ nerdctl 优化操作（点击展开）</summary>
+
+##### 使用 `docker` 别名
+
+```powershell
 copy "C:\Program Files\nerdctl\nerdctl.exe" "C:\Program Files\nerdctl\docker.exe"
 ```
 
-##### 2.修改路径
+##### 迁移数据目录
 
-默认会使用`C:\ProgramData\containerd\`作为容器目录，会占用C盘空间
-编辑`C:\Program Files\containerd\config.toml`
+编辑 `C:\Program Files\containerd\config.toml`：
 
 ```toml
-root = "D:\\Nerd\\root" # <-----------修改此处
-state = "D:\\Nerd\\state" # <-----------修改此处
-......
+root = "D:\\Nerd\\root"
+state = "D:\\Nerd\\state"
 
-  [plugins."io.containerd.internal.v1.opt"]
-    path = "D:\\Nerd\\root\\opt" # <-----------修改此处
+[plugins."io.containerd.internal.v1.opt"]
+  path = "D:\\Nerd\\root\\opt"
 ```
 
-然后删除所有镜像和容器关闭容器服务：
+然后迁移数据：
 
-```PowerShell
+```powershell
 docker stop $(docker ps -aq)
 docker rm $(docker ps -aq)
 docker rmi $(docker images -q)
 net stop containerd
 tskill containerd
-```
 
-迁移文件数据：
-
-```PowerShell
 mkdir "D:\Nerd"
-# move "C:\ProgramData\containerd\*" "D:\Nerd\" # <---建议不要移动而是复制
 xcopy "C:\ProgramData\containerd\" "D:\Nerd\" /E /H /C /I /Y
-```
-
-启动容器服务
-
-```PowerShell
 net start containerd
 ```
 
+</details>
 
+### 系统激活
 
+```powershell
+irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/Active/MAS_AIO.cmd | iex
+```
+
+Microsoft Activation Scripts (MAS) AIO v3.10，支持 Windows 和 Office 全系列激活。
+
+---
+
+## 📁 项目结构
+
+```
+CloudScripts/
+├── Menu.sh                     # ⭐ 总菜单入口（自动识别系统）
+├── README.MD                   # 本文档
+│
+├── Linux/
+│   ├── VPSSets/                # VPS 服务器部署
+│   │   ├── Setup.sh            #   交互式一键部署
+│   │   └── Vault.sh            #   AES-256 凭据生成器
+│   ├── Desktop/                # Debian LXC 桌面环境（8种）
+│   ├── VPSTest/                # 性能测评（13款工具）
+│   ├── Cleaner/                # 系统清理
+│   └── Tunnels/3x-ui/          # 3X-UI 代理面板
+│
+└── WinNT/
+    ├── Docker/                  # Docker CE / Mirantis / nerdctl
+    └── Active/                  # Windows/Office 激活 (MAS)
+```
+
+---
+
+## 🔗 地址说明
+
+| 类型 | 地址 |
+|:-----|:-----|
+| 📦 GitHub | <https://github.com/PIKACHUIM/CloudScripts> |
+| 🚀 国内加速 | <https://github.524228.xyz/PIKACHUIM/CloudScripts> |
+| 📥 直连 Raw | `https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main` |
+| ⚡ 加速 Raw | `https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main` |
+
+> Menu.sh 启动时会自动测速，优先使用直连，超时则自动切换到加速地址。
+
+---
+
+## 📄 许可证
+
+本项目同时包含 [GNU GPL](LICENSE) 和 [MIT](LICENSE-MIT) 许可的组件，详见各子目录。
