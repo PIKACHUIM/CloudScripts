@@ -12,167 +12,194 @@ set -e
 : "${PIKA_CYAN:=$(printf '\033[0;36m')}"; : "${PIKA_MAGENTA:=$(printf '\033[0;35m')}"
 : "${PIKA_BOLD:=$(printf '\033[1m')}"; : "${PIKA_NC:=$(printf '\033[0m')}"
 
+# ============================================================
+#  CJK-aware display width (pure bash, no external deps)
+#  Uses python3 if available (accurate east-asian-width),
+#  otherwise a fast UTF-8 byte heuristic (3/4-byte lead -> 2-wide).
+# ============================================================
+_ui_str_width() {
+    local s="$1"
+    # Prefer python3 for accuracy
+    if command -v python3 >/dev/null 2>&1 && python3 -c "" 2>/dev/null; then
+        local w
+        w=$(python3 -c "import sys,unicodedata; s=sys.argv[1]; print(sum(2 if unicodedata.east_asian_width(c) in ('W','F') else 1 for c in s))" -- "$s" 2>/dev/null)
+        if [ -n "$w" ] && [ "$w" -ge 0 ] 2>/dev/null; then
+            echo "$w"
+            return
+        fi
+    fi
+
+    # Fallback: count chars and 3/4-byte lead bytes under LC_ALL=C
+    local _lc_saved="${LC_ALL-__PIKA_UNSET__}"
+    LC_ALL=C
+
+    local leads="${s//[$'\x80'-$'\xbf']/}"
+    local chars=${#leads}
+    local wides="${leads//[!$'\xe0'-$'\xf7']/}"
+    local wide=${#wides}
+
+    if [ "$_lc_saved" = "__PIKA_UNSET__" ]; then unset LC_ALL; else LC_ALL="$_lc_saved"; fi
+
+    echo $((chars + wide))
+}
+
+# ---- Repeat a single character N times (no external deps) ----
+_ui_repeat_char() {
+    local char="$1" count="${2:-0}"
+    case "$count" in ''|*[!0-9]*) return ;; esac
+    local s="" i=0
+    while [ "$i" -lt "$count" ]; do
+        s="${s}${char}"
+        i=$((i + 1))
+    done
+    printf '%s' "$s"
+}
+
 # ---- Terminal width ----
 _pika_term_width() {
-    tput cols 2>/dev/null || echo 80
+    local w="${COLUMNS:-}"
+    [ -z "$w" ] && w=$(tput cols 2>/dev/null || echo 80)
+    case "$w" in ''|*[!0-9]*) w=80 ;; esac
+    echo "$w"
 }
 
 # ---- Clear screen ----
 ui_clear() { clear 2>/dev/null || printf '\033[2J\033[H'; }
 
-# ---- Print header banner ----
+# ============================================================
+#  Header banner — ASCII-art PIKA logo (fixed width, no CJK calc needed)
+#    ╔══════════════════════════════════════════════════╗
+#    ║      ██████╗ ██╗██╗  ██╗ █████╗                  ║
+#    ║      ██╔══██╗██║██║ ██╔╝██╔══██╗                 ║
+#    ║      ██████╔╝██║█████╔╝ ███████║                 ║
+#    ║      ██╔═══╝ ██║██╔═██╗ ██╔══██║                 ║
+#    ║      ██║     ██║██║  ██╗██║  ██║                 ║
+#    ║      ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝                 ║
+#    ║                                                  ║
+#    ║      皮卡在线脚本托管平台 — 总菜单            v1.0  ║
+#    ╚══════════════════════════════════════════════════╝
+# ============================================================
 ui_header() {
-    local w; w=$(_pika_term_width)
-    local _line; _line=$(_ui_repeat_char '═' $((w-4)))
-    local ver_full="${PIKA_VERSION_FULL:-${PIKA_VERSION:-0.0}}"
-    local ver_pad; ver_pad=$(( w - 9 - ${#ver_full} - 1 ))
-    [ "$ver_pad" -lt 1 ] && ver_pad=1
-    printf '%s\n' "${PIKA_CYAN}"
-    printf '  ╔%s╗\n' "$_line"
-    printf '  ║  %s%s%s%s%sv%s  ║\n' \
-        "${PIKA_BOLD}" "$(t 'app.name')" "${PIKA_NC}" "${PIKA_CYAN}" "$(printf '%*s' "$ver_pad" '')" "$ver_full"
-    printf '  ╚%s╝\n' "$_line"
-    printf '%s\n' "${PIKA_NC}"
+    local ver="v${PIKA_VERSION_FULL:-${PIKA_VERSION:-0.0}}"
+    local c="${PIKA_CYAN}" n="${PIKA_NC}" b="${PIKA_BOLD}"
+
+    clear 2>/dev/null || printf '\033[2J\033[H'
+    printf '%s\n' "$c"
+    printf '  ╔══════════════════════════════════════════════════╗\n'
+    printf '  ║      %s██████╗%s ██╗██╗  ██╗ %s█████╗%s                  ║\n' "$b" "$c" "$b" "$c"
+    printf '  ║      %s██╔══██╗%s██║██║ ██╔╝%s██╔══██╗%s                 ║\n' "$b" "$c" "$b" "$c"
+    printf '  ║      %s██████╔╝%s██║█████╔╝ %s███████║%s                 ║\n' "$b" "$c" "$b" "$c"
+    printf '  ║      %s██╔═══╝%s ██║██╔═██╗ %s██╔══██║%s                 ║\n' "$b" "$c" "$b" "$c"
+    printf '  ║      %s██║%s     ██║██║  ██╗%s██║  ██║%s                 ║\n' "$b" "$c" "$b" "$c"
+    printf '  ║      %s╚═╝%s     ╚═╝╚═╝  ╚═╝%s╚═╝  ╚═╝%s                 ║\n' "$b" "$c" "$b" "$c"
+    printf '  ║                                                  ║\n'
+    printf '  ║      %s%s%s         %s%s%s  ║\n' \
+        "$b" "$(t 'app.name')" "$c" "$PIKA_GREEN" "$ver" "$c"
+    printf '  ╚══════════════════════════════════════════════════╝\n'
+    printf '%s' "$n"
 }
 
-# ---- Print section title ----
+# ---- Section title ----
 ui_section() {
     printf '\n  %s%s▸ %s%s\n' "${PIKA_YELLOW}" "${PIKA_BOLD}" "$1" "${PIKA_NC}"
 }
 
-# ---- Print divider ----
+# ---- Divider ----
 ui_divider() {
-    local _line; _line=$(_ui_repeat_char '─' $(($(_pika_term_width)-4)))
-    printf '  %s%s%s\n' "${PIKA_CYAN}" "$_line" "${PIKA_NC}"
+    printf '  %s%s%s\n' "${PIKA_CYAN}" '──────────────────────────────────────────────────' "${PIKA_NC}"
 }
 
-# ---- Repeat a single character N times (no external deps) ----
-_ui_repeat_char() {
-    local char="$1" count="$2"
-    [ "$count" -le 0 ] 2>/dev/null && return
-    local s=""
-    local i=0
-    while [ $i -lt "$count" ]; do
-        s="${s}${char}"
-        i=$((i+1))
-    done
-    echo "$s"
-}
-
-# ---- Print a menu item: [number] name ........ description ----
-# Handles CJK character width for proper alignment
+# ============================================================
+#  Menu item:  [1]  Name                Description
+# ============================================================
 ui_item() {
     local num="$1" name="$2" desc="${3:-}"
-    local target_width=32  # Name column target display width
+    local name_col=30   # target display width of the name column
 
-    local name_w; name_w=$(_ui_str_width "$name")
-    local pad=$((target_width - name_w))
-    [ $pad -lt 2 ] && pad=2
-    local spacing; spacing=$(printf '%*s' $pad '')
+    local spacing; spacing=$(_ui_pad_to "$name" "$name_col")
 
-    printf "  ${PIKA_GREEN}%4s${PIKA_NC}  ${PIKA_BOLD}%s${PIKA_NC}%s${PIKA_BLUE}%s${PIKA_NC}\n" \
-        "[$num]" "$name" "$spacing" "$desc"
-}
-
-# ---- CJK-aware string display width ----
-# Prefers python3 > python > pure bash fallback
-_ui_str_width() {
-    local s="$1"
-    if command -v python3 >/dev/null 2>&1; then
-        python3 -c "import sys,unicodedata; s=sys.argv[1]; print(sum(2 if unicodedata.east_asian_width(c) in ('W','F') else 1 for c in s))" -- "$s" 2>/dev/null && return
-    elif command -v python >/dev/null 2>&1; then
-        python -c "import sys,unicodedata; s=sys.argv[1]; print(sum(2 if unicodedata.east_asian_width(c) in ('W','F') else 1 for c in s))" -- "$s" 2>/dev/null && return
+    if [ -n "$desc" ]; then
+        printf '  %s%4s%s  %s%s%s%s  %s%s%s\n' \
+            "${PIKA_GREEN}" "[$num]" "${PIKA_NC}" \
+            "${PIKA_BOLD}" "$name" "${PIKA_NC}" "$spacing" \
+            "${PIKA_BLUE}" "$desc" "${PIKA_NC}"
+    else
+        printf '  %s%4s%s  %s%s%s\n' \
+            "${PIKA_GREEN}" "[$num]" "${PIKA_NC}" \
+            "${PIKA_BOLD}" "$name" "${PIKA_NC}"
     fi
-
-    # Pure bash fallback: count bytes in multi-byte ranges as 2-wide
-    local w=0 c i=0 len=${#s}
-    while [ $i -lt $len ]; do
-        c="${s:$i:1}"
-        local byte
-        byte=$(printf '%d' "'$c" 2>/dev/null || echo "0")
-        # Ensure byte is numeric before arithmetic comparison
-        case "$byte" in
-            ''|*[!0-9]*) byte=0 ;;
-        esac
-        if [ "$byte" -ge 19968 ] 2>/dev/null; then w=$((w+2))  # U+4E00+
-        elif [ "$byte" -ge 12288 ] 2>/dev/null && [ "$byte" -le 12543 ] 2>/dev/null; then w=$((w+2))
-        elif [ "$byte" -ge 65072 ] 2>/dev/null && [ "$byte" -le 65119 ] 2>/dev/null; then w=$((w+2))
-        elif [ "$byte" -ge 63744 ] 2>/dev/null && [ "$byte" -le 64045 ] 2>/dev/null; then w=$((w+2))
-        else w=$((w+1))
-        fi
-        i=$((i+1))
-    done
-    echo $w
 }
 
-# ---- Render a data-driven menu ----
-# Usage: ui_menu "MENU_TITLE" "MENU_ARRAY_NAME" ["BACK_LABEL"]
-# The array should contain entries like: "key|title_i18n_key|desc_i18n_key|handler"
+# ============================================================
+#  Render a data-driven menu
+#  Usage: ui_menu "TITLE" "MENU_ARRAY_NAME" ["BACK_LABEL"]
+#  Array entries: "key|title_i18n_key|desc_i18n_key|handler"
+# ============================================================
 ui_menu() {
     local title="$1" array_name="$2" back_label="${3:-}"
     local -n entries="$array_name"
 
     ui_section "$title"
-    local idx=1
+    local idx=1 entry key title_key desc_key handler
     for entry in "${entries[@]}"; do
-        local key title_key desc_key handler
         IFS='|' read -r key title_key desc_key handler <<< "$entry"
         ui_item "$idx" "$(t "$title_key")" "$(t "$desc_key")"
         idx=$((idx + 1))
     done
 
-    if [ -n "$back_label" ]; then
-        ui_item "0" "$back_label" ""
-    fi
+    [ -n "$back_label" ] && ui_item "0" "$back_label" ""
 
-    echo ""
-    printf "  $(t 'menu.prompt') "
+    printf '\n'
+    printf '  %s ' "$(t 'menu.prompt')"
 }
 
-# ---- Dispatch menu selection ----
-# Usage: ui_dispatch MENU_ARRAY_NAME selection
-# Returns 0 on success, non-zero on invalid selection or back (selection=0)
+# ============================================================
+#  Dispatch menu selection
+#  Returns: 0 = handled, 1 = invalid, 2 = back
+# ============================================================
 ui_dispatch() {
     local -n ents="$1"
     local sel="${2:-0}"
 
-    # 0 = back
     [ "$sel" = "0" ] && return 2
 
-    local idx=1 found=0
+    local idx=1 entry key title_key desc_key handler
     for entry in "${ents[@]}"; do
         if [ "$idx" = "$sel" ]; then
-            local key title_key desc_key handler
             IFS='|' read -r key title_key desc_key handler <<< "$entry"
             if [ -n "$handler" ] && declare -F "$handler" >/dev/null 2>&1; then
                 "$handler" "$key"
                 return $?
-            else
-                pika_err "未实现的处理函数: ${handler:-N/A}"
-                return 1
             fi
-            found=1
-            break
+            pika_err "$(t 'ui.nohandler'): ${handler:-N/A}"
+            return 1
         fi
         idx=$((idx + 1))
     done
 
-    [ "$found" = "0" ] && { pika_warn "无效选择: $sel"; return 1; }
+    return 1
 }
 
-# ---- Install confirmation dialog ----
+# ============================================================
+#  Install confirmation dialog
+#    ┌──────────────────────────────────────┐
+#    │ 即将安装: Docker CE                  │
+#    ├──────────────────────────────────────┤
+#    │   容器引擎 + 国内镜像加速            │
+#    └──────────────────────────────────────┘
+# ============================================================
 ui_confirm_install() {
-    local name="$1" desc="$2" version="${3:-}" url="${4:-}"
+    local name="$1" desc="${2:-}" version="${3:-}" url="${4:-}"
+    local line='──────────────────────────────────────'
 
-    local _hdr; _hdr=$(_ui_repeat_char '─' $(($(_pika_term_width)-6)))
     printf '\n'
-    printf '  %s┌%s┐%s\n' "${PIKA_CYAN}" "$_hdr" "${PIKA_NC}"
-    printf "  ${PIKA_CYAN}│${PIKA_NC} ${PIKA_BOLD}$(t 'ui.install')${PIKA_NC}: %-$(($(_pika_term_width)-17))s ${PIKA_CYAN}│${PIKA_NC}\n" "$name"
-    printf '  %s├%s┤%s\n' "${PIKA_CYAN}" "$_hdr" "${PIKA_NC}"
-    printf "  ${PIKA_CYAN}│${PIKA_NC} %-$(($(_pika_term_width)-8))s ${PIKA_CYAN}│${PIKA_NC}\n" "  $desc"
-    [ -n "$version" ] && printf "  ${PIKA_CYAN}│${PIKA_NC} $(t 'ui.version'): %-$(($(_pika_term_width)-18))s ${PIKA_CYAN}│${PIKA_NC}\n" "$version"
-    [ -n "$url" ] && printf "  ${PIKA_CYAN}│${PIKA_NC} %-$(($(_pika_term_width)-8))s ${PIKA_CYAN}│${PIKA_NC}\n" "  $url"
-    printf '  %s└%s┘%s\n' "${PIKA_CYAN}" "$_hdr" "${PIKA_NC}"
+    printf '  %s┌%s┐%s\n' "${PIKA_CYAN}" "$line" "${PIKA_NC}"
+    printf '  %s│%s %s%s%s %s│%s\n' "${PIKA_CYAN}" "${PIKA_NC}" "${PIKA_BOLD}" "$(t 'ui.install'): ${name}" "${PIKA_NC}" "${PIKA_CYAN}" "${PIKA_NC}"
+    printf '  %s├%s┤%s\n' "${PIKA_CYAN}" "$line" "${PIKA_NC}"
+    [ -n "$desc" ]    && printf '  %s│%s   %s %s│%s\n' "${PIKA_CYAN}" "${PIKA_NC}" "${desc}" "${PIKA_CYAN}" "${PIKA_NC}"
+    [ -n "$version" ] && printf '  %s│%s   %s: %s %s│%s\n' "${PIKA_CYAN}" "${PIKA_NC}" "$(t 'ui.version')" "${version}" "${PIKA_CYAN}" "${PIKA_NC}"
+    [ -n "$url" ]     && printf '  %s│%s   %s%s%s %s│%s\n' "${PIKA_CYAN}" "${PIKA_NC}" "${PIKA_BLUE}" "${url}" "${PIKA_NC}" "${PIKA_CYAN}" "${PIKA_NC}"
+    printf '  %s└%s┘%s\n' "${PIKA_CYAN}" "$line" "${PIKA_NC}"
 
     pika_confirm "$(t 'ui.confirm')"
 }

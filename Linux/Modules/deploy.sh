@@ -14,7 +14,11 @@ DeployMENU=(
     "panel_1panel|deploy.panel.1panel|deploy.panel.1panel.desc|do_1panel"
     "panel_bt|deploy.panel.bt|deploy.panel.bt.desc|do_btpanel"
     "panel_nezha|deploy.panel.nezha|deploy.panel.nezha.desc|do_nezha"
+    "panel_netpanel|deploy.panel.netpanel|deploy.panel.netpanel.desc|do_netpanel"
     "node|deploy.node|deploy.node.desc|do_node"
+    "easytier|deploy.easytier|deploy.easytier.desc|do_easytier"
+    "frps|deploy.frps|deploy.frps.desc|do_frps"
+    "rustdesk|deploy.rustdesk|deploy.rustdesk.desc|do_rustdesk"
 )
 
 # ---- Handlers ----
@@ -96,4 +100,29 @@ do_node() {
     ui_confirm_install "Node.js + PM2" "$(t 'deploy.node.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     ensure_node_pm2
     pika_info "$(t 'common.done') - Node.js $(node --version 2>/dev/null || echo '?') + PM2 $(pm2 -v 2>/dev/null || echo '?')"
+}
+
+do_netpanel() {
+    ui_confirm_install "NetPanel" "$(t 'deploy.panel.netpanel.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') NetPanel..."
+    pkg_install curl wget
+    curl -fsSL https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/netpanel/install.sh | bash -e
+}
+
+do_easytier() {
+    ui_confirm_install "EasyTier" "$(t 'deploy.easytier.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') EasyTier..."
+    bash <(curl -fsSL https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh) 7
+}
+
+do_frps() {
+    ui_confirm_install "FRPS" "$(t 'deploy.frps.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') FRPS..."
+    bash <(curl -fsSL https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh) 8
+}
+
+do_rustdesk() {
+    ui_confirm_install "RustDesk" "$(t 'deploy.rustdesk.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') RustDesk relay..."
+    bash <(curl -fsSL https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh) A
 }

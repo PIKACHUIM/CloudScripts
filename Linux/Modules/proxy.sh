@@ -14,6 +14,8 @@ ProxyMENU=(
     "warp|proxy.warp|proxy.warp.desc|do_proxy_warp"
     "wireguard|proxy.wireguard|proxy.wireguard.desc|do_proxy_wireguard"
     "wgeasy|proxy.wgeasy|proxy.wgeasy.desc|do_proxy_wgeasy"
+    "zerotier|proxy.zerotier|proxy.zerotier.desc|do_proxy_zerotier"
+    "tailscale|proxy.tailscale|proxy.tailscale.desc|do_proxy_tailscale"
 )
 
 _run_proxy_installer() {
@@ -101,4 +103,18 @@ do_proxy_wgeasy() {
     pika_info "$(t 'common.done')"
     echo "  $(t 'proxy.wgeasy.panel'): http://SERVER_IP:$port"
     echo "  $(t 'proxy.wgeasy.password'): $pass"
+}
+
+do_proxy_zerotier() {
+    ui_confirm_install "ZeroTier" "$(t 'proxy.zerotier.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') ZeroTier..."
+    curl -fsSL https://install.zerotier.com | bash -e
+    pika_info "$(t 'common.done') - ZeroTier"
+}
+
+do_proxy_tailscale() {
+    ui_confirm_install "Tailscale" "$(t 'proxy.tailscale.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') Tailscale..."
+    curl -fsSL https://tailscale.com/install.sh | bash -e
+    pika_info "$(t 'common.done') - Tailscale"
 }

@@ -49,6 +49,12 @@ T_deploy_panel_nezha="Install Nezha Monitor"
 T_deploy_panel_nezha_desc="Multi-server probe & alerts"
 T_deploy_node="Install Node.js + PM2"
 T_deploy_node_desc="Frontend runtime + process manager"
+T_deploy_easytier="Install EasyTier"
+T_deploy_easytier_desc="P2P networking with proxy support"
+T_deploy_frps="Install FRPS"
+T_deploy_frps_desc="FRP reverse proxy server"
+T_deploy_rustdesk="Install RustDesk Relay"
+T_deploy_rustdesk_desc="Remote desktop relay service"
 
 # ---- Maintain submenu ----
 T_maintain_clean="System Cleanup"
@@ -139,6 +145,10 @@ T_proxy_wireguard="WireGuard"
 T_proxy_wireguard_desc="Modern VPN tunneling"
 T_proxy_wgeasy="wg-easy"
 T_proxy_wgeasy_desc="WireGuard web admin panel"
+T_proxy_zerotier="ZeroTier"
+T_proxy_zerotier_desc="Global virtual LAN networking"
+T_proxy_tailscale="Tailscale"
+T_proxy_tailscale_desc="Zero-config VPN based on WireGuard"
 
 # ---- System submenu ----
 T_system_ssh="SSH Hardening"

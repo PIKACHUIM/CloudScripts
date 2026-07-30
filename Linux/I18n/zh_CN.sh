@@ -49,6 +49,12 @@ T_deploy_panel_nezha="安装哪吒监控"
 T_deploy_panel_nezha_desc="多服务器探针与告警"
 T_deploy_node="安装 Node.js + PM2"
 T_deploy_node_desc="前端运行时 + 进程管理器"
+T_deploy_easytier="安装 EasyTier"
+T_deploy_easytier_desc="点对点组网工具，支持代理配置"
+T_deploy_frps="安装 FRPS 服务"
+T_deploy_frps_desc="FRP 内网穿透服务端"
+T_deploy_rustdesk="安装 RustDesk 中转"
+T_deploy_rustdesk_desc="远程桌面中继服务"
 
 # ---- Maintain submenu ----
 T_maintain_clean="系统清理"
@@ -139,6 +145,10 @@ T_proxy_wireguard="WireGuard"
 T_proxy_wireguard_desc="现代化 VPN 组网"
 T_proxy_wgeasy="wg-easy"
 T_proxy_wgeasy_desc="WireGuard Web 管理面板"
+T_proxy_zerotier="ZeroTier"
+T_proxy_zerotier_desc="全球虚拟局域网组网"
+T_proxy_tailscale="Tailscale"
+T_proxy_tailscale_desc="基于 WireGuard 的零配置组网"
 
 # ---- System submenu ----
 T_system_ssh="SSH 安全加固"
