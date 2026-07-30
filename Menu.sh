@@ -1,31 +1,26 @@
 #!/usr/bin/env bash
 # ============================================================
-#  皮卡在线脚本托管平台 - 总菜单
-#  两级菜单：主菜单(4大类) → 子菜单(具体脚本)
+#  PIKA SH - 服务器脚本工具箱
+#  两级菜单：主菜单(5大类) → 子菜单(具体脚本)
 #
 #  使用方式:
-#    远程一键:  bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
-#    国内加速:  bash <(curl -s https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
+#    bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
+#    bash <(curl -s https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
 # ============================================================
-
 set -e
 
-# ---- 颜色定义 ----
+# ---- 颜色 ----
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; CYAN='\033[0;36m'; MAGENTA='\033[0;35m'
 BOLD='\033[1m'; NC='\033[0m'
 
-# ---- CDN 地址 ----
+# ---- CDN ----
 CDN_RAW="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
 CDN_MIRROR="https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
 _choose_cdn() {
-    if curl -s --connect-timeout 3 --max-time 5 "${CDN_RAW}/Menu.sh" > /dev/null 2>&1; then
-        echo "$CDN_RAW"
-    elif curl -s --connect-timeout 3 --max-time 5 "${CDN_MIRROR}/Menu.sh" > /dev/null 2>&1; then
-        echo "$CDN_MIRROR"
-    else
-        echo "$CDN_RAW"
-    fi
+    if curl -s --connect-timeout 3 --max-time 5 "${CDN_RAW}/Menu.sh" >/dev/null 2>&1; then echo "$CDN_RAW"
+    elif curl -s --connect-timeout 3 --max-time 5 "${CDN_MIRROR}/Menu.sh" >/dev/null 2>&1; then echo "$CDN_MIRROR"
+    else echo "$CDN_RAW"; fi
 }
 CDN_BASE=$(_choose_cdn)
 
@@ -33,15 +28,16 @@ CDN_BASE=$(_choose_cdn)
 detect_os() {
     case "$(uname -s)" in
         Linux)  echo "linux|$(. /etc/os-release 2>/dev/null && echo "${NAME:-Linux}" || echo 'Linux')" ;;
-        Darwin) echo "macos|macOS $(sw_vers -productVersion 2>/dev/null || echo '')" ;;
-        MINGW*|MSYS*|CYGWIN*) echo "windows|Windows (Git Bash / MSYS2)" ;;
+        Darwin) echo "macos|macOS $(sw_vers -productVersion 2>/dev/null)" ;;
+        MINGW*|MSYS*|CYGWIN*) echo "windows|Windows (Git Bash)" ;;
         *)      echo "unknown|$(uname -s)" ;;
     esac
 }
-OS_INFO=$(detect_os)
-OS_TYPE="${OS_INFO%%|*}"; OS_DETAIL="${OS_INFO##*|}"
+OS_INFO=$(detect_os); OS_TYPE="${OS_INFO%%|*}"; OS_DETAIL="${OS_INFO##*|}"
+detect_distro_id() { . /etc/os-release 2>/dev/null && echo "${ID:-unknown}" || echo "unknown"; }
+DISTRO_ID=$(detect_distro_id)
 
-# ---- 打印函数 ----
+# ---- 打印 ----
 clear_screen() { clear; }
 print_header() {
     echo -e "${CYAN}"
@@ -62,39 +58,293 @@ print_line() { echo -e "  ${CYAN}───────────────�
 print_section() { echo -e "\n  ${YELLOW}${BOLD}  $1${NC}"; }
 print_item() { printf "  ${GREEN}%4s${NC}  ${BOLD}%-28s${NC} ${BLUE}%s${NC}\n" "[$1]" "$2" "$3"; }
 print_tip() { echo -e "  ${MAGENTA}  💡 $1${NC}"; }
+print_done() { echo -e "\n  ${GREEN}✅ $1 完成！${NC}"; }
+print_warn() { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
 
 # ---- 脚本执行器 ----
 run_setup() { bash <(curl -s "${CDN_BASE}/Linux/VPSSets/Setup.sh") "$@"; }
-run_script() { bash <(curl -s "${CDN_BASE}/$1"); }
 run_script_pipe() { curl -s "${CDN_BASE}/$1" | bash -e; }
 run_bench() { bash <(wget -qO- "${CDN_BASE}/Linux/VPSTest/$1"); }
 run_clean() { apt -y install curl 2>/dev/null; curl -s "${CDN_BASE}/Linux/Cleaner/LinuxClean.sh" | bash; }
 
 # ============================================================
-# 子菜单：一键部署
+# 安装函数库
+# ============================================================
+
+# ---- 换大陆镜像源 ----
+switch_apt_mirror() {
+    echo -e "\n  ${BOLD}正在更换 APT 镜像源...${NC}"
+    case "$DISTRO_ID" in
+        debian)
+            sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true
+            sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list 2>/dev/null || true
+            ;;
+        ubuntu)
+            sed -i 's|archive.ubuntu.com|mirrors.ustc.edu.cn|g' /etc/apt/sources.list 2>/dev/null || true
+            sed -i 's|security.ubuntu.com|mirrors.ustc.edu.cn|g' /etc/apt/sources.list 2>/dev/null || true
+            ;;
+        centos|rhel|rocky|almalinux|fedora)
+            echo -e "  ${YELLOW}请手动更换 YUM/DNF 源${NC}"
+            ;;
+        *) print_warn "未知发行版，跳过换源" ;;
+    esac
+    apt update -y 2>/dev/null || true
+    print_done "镜像源更换"
+}
+
+# ---- 1Panel ----
+install_1panel() {
+    echo -e "\n  ${BOLD}正在安装 1Panel...${NC}"
+    curl -sSL https://resource.fit2cloud.com/1panel/package/quick_start.sh -o /tmp/1panel.sh
+    bash /tmp/1panel.sh
+    rm -f /tmp/1panel.sh
+    print_done "1Panel 安装"
+}
+
+# ---- NetPanel ----
+install_netpanel() {
+    echo -e "\n  ${BOLD}正在安装 NetPanel...${NC}"
+    bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/NetPanel/main/install.sh) 2>/dev/null || {
+        print_warn "NetPanel 安装脚本获取失败，请检查仓库"
+    }
+    print_done "NetPanel 安装"
+}
+
+# ---- Docker + 1ms 镜像源 ----
+install_docker() {
+    echo -e "\n  ${BOLD}正在安装 Docker...${NC}"
+    if command -v docker &>/dev/null; then
+        echo -e "  ${GREEN}Docker 已安装: $(docker --version)${NC}"
+    else
+        curl -fsSL https://get.docker.com | bash
+    fi
+    # 配置 1ms 镜像加速
+    mkdir -p /etc/docker
+    cat > /etc/docker/daemon.json << 'DOCKEREOF'
+{
+  "registry-mirrors": ["https://docker.1ms.run"],
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "10m", "max-file": "3" }
+}
+DOCKEREOF
+    systemctl restart docker 2>/dev/null || service docker restart 2>/dev/null || true
+    print_done "Docker 安装 (镜像加速: 1ms.run)"
+}
+
+# ---- Podman + 镜像源 ----
+install_podman() {
+    echo -e "\n  ${BOLD}正在安装 Podman...${NC}"
+    apt install -y podman 2>/dev/null || yum install -y podman 2>/dev/null || true
+    mkdir -p /etc/containers
+    cat > /etc/containers/registries.conf << 'PODMANEOF'
+unqualified-search-registries = ["docker.io"]
+[[registry]]
+prefix = "docker.io"
+location = "docker.1ms.run"
+PODMANEOF
+    print_done "Podman 安装 (镜像加速: 1ms.run)"
+}
+
+# ---- 屏蔽地区 (BlockAreaBot) ----
+block_area_bot() {
+    echo -e "\n  ${BOLD}正在下载 BlockAreaBot...${NC}"
+    curl -sSL "https://raw.githubusercontent.com/PIKACHUIM/BlockAreaBot/main/block.sh" -o /tmp/block_area.sh 2>/dev/null || {
+        print_warn "BlockAreaBot 下载失败"; return 1
+    }
+    bash /tmp/block_area.sh
+    rm -f /tmp/block_area.sh
+}
+
+# ---- 升级/替换内核 ----
+upgrade_kernel() {
+    echo -e "\n  ${BOLD}内核管理${NC}"
+    echo -e "  请选择内核方案:"
+    echo -e "  ${GREEN}  [1]${NC} 安装 XanMod 内核 (高性能)"
+    echo -e "  ${GREEN}  [2]${NC} 安装 Liquorix 内核 (低延迟)"
+    echo -e "  ${GREEN}  [3]${NC} 升级到 Debian Backports 内核"
+    echo -e "  ${GREEN}  [4]${NC} 升级到 Ubuntu HWE 内核"
+    echo -ne "  ${BOLD}请选择${NC} > "; read KK
+    case "$KK" in
+        1) echo 'deb http://deb.xanmod.org releases main' > /etc/apt/sources.list.d/xanmod.list
+           wget -qO - https://dl.xanmod.org/gpg.key | apt-key add - 2>/dev/null || true
+           apt update && apt install -y linux-xanmod-x64v3 ;;
+        2) curl -s 'https://liquorix.net/add-liquorix-repo.sh' | bash
+           apt install -y linux-image-liquorix-amd64 linux-headers-liquorix-amd64 ;;
+        3) apt install -y -t bookworm-backports linux-image-amd64 linux-headers-amd64 2>/dev/null || true ;;
+        4) apt install -y linux-generic-hwe-22.04 2>/dev/null || true ;;
+        *) echo -e "  ${RED}无效选项${NC}"; return 1 ;;
+    esac
+    print_done "内核安装"
+    echo -e "  ${YELLOW}请重启系统以使用新内核: reboot${NC}"
+}
+
+# ---- Clash for Linux ----
+install_clash_linux() {
+    echo -e "\n  ${BOLD}正在安装 Clash for Linux...${NC}"
+    local CLASH_TAG
+    CLASH_TAG=$(curl -s --connect-timeout 10 "https://api.github.com/repos/nelvko/clash-for-linux-install/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    [ -z "$CLASH_TAG" ] && { print_warn "无法获取版本"; return 1; }
+    echo -e "  版本: ${CLASH_TAG}"
+    wget -O /tmp/clash-linux-install.tar.gz "https://github.com/nelvko/clash-for-linux-install/releases/download/${CLASH_TAG}/clash-for-linux-install-${CLASH_TAG}.tar.gz" 2>/dev/null
+    if [ -f /tmp/clash-linux-install.tar.gz ]; then
+        tar -xzf /tmp/clash-linux-install.tar.gz -C /tmp/
+        bash /tmp/clash-for-linux-install-*/install.sh 2>/dev/null || bash /tmp/install.sh 2>/dev/null || print_warn "安装失败，请检查压缩包结构"
+        rm -rf /tmp/clash-linux-install* /tmp/clash-for-linux-install*
+    else
+        print_warn "下载失败"
+    fi
+    print_done "Clash for Linux"
+}
+
+# ---- Hysteria2 ----
+install_hy2() {
+    echo -e "\n  ${BOLD}正在安装 Hysteria2...${NC}"
+    bash <(curl -fsSL https://get.hy2.sh/) 2>/dev/null || {
+        bash <(curl -fsSL https://raw.githubusercontent.com/apernet/hysteria/master/install_server.sh)
+    }
+    print_done "Hysteria2 安装"
+}
+
+# ---- Shadowsocks-rust ----
+install_shadowsocks() {
+    echo -e "\n  ${BOLD}正在安装 Shadowsocks-rust...${NC}"
+    if command -v ssserver &>/dev/null; then
+        echo -e "  ${GREEN}Shadowsocks 已安装${NC}"; return 0
+    fi
+    local SS_VER
+    SS_VER=$(curl -s "https://api.github.com/repos/shadowsocks/shadowsocks-rust/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    [ -z "$SS_VER" ] && SS_VER="v1.20.4"
+    local ARCH; ARCH=$(uname -m)
+    case "$ARCH" in x86_64) ARCH="x86_64-unknown-linux-gnu" ;; aarch64) ARCH="aarch64-unknown-linux-gnu" ;; esac
+    local SS_URL="https://github.com/shadowsocks/shadowsocks-rust/releases/download/${SS_VER}/shadowsocks-${SS_VER}.${ARCH}.tar.xz"
+    wget -O /tmp/ss-rust.tar.xz "$SS_URL" 2>/dev/null
+    tar -xf /tmp/ss-rust.tar.xz -C /usr/local/bin/ 2>/dev/null
+    chmod +x /usr/local/bin/ss* 2>/dev/null
+    rm -f /tmp/ss-rust.tar.xz
+    print_done "Shadowsocks-rust 安装"
+    echo -e "  使用方法: ${CYAN}ssserver -s 0.0.0.0 -p 8388 -k PASSWORD -m aes-256-gcm${NC}"
+}
+
+# ---- Trojan-Go ----
+install_trojan() {
+    echo -e "\n  ${BOLD}正在安装 Trojan-Go...${NC}"
+    local TROJ_VER
+    TROJ_VER=$(curl -s "https://api.github.com/repos/p4gefau1t/trojan-go/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    [ -z "$TROJ_VER" ] && TROJ_VER="v0.10.6"
+    local ARCH; ARCH=$(uname -m)
+    case "$ARCH" in x86_64) ARCH="amd64" ;; aarch64) ARCH="arm64" ;; esac
+    local TROJ_URL="https://github.com/p4gefau1t/trojan-go/releases/download/${TROJ_VER}/trojan-go-linux-${ARCH}.zip"
+    wget -O /tmp/trojan-go.zip "$TROJ_URL" 2>/dev/null
+    unzip -o /tmp/trojan-go.zip -d /usr/local/bin/ 2>/dev/null
+    chmod +x /usr/local/bin/trojan-go 2>/dev/null
+    rm -f /tmp/trojan-go.zip
+    print_done "Trojan-Go 安装"
+}
+
+# ---- Cloudflare WARP ----
+install_warp() {
+    echo -e "\n  ${BOLD}正在安装 Cloudflare WARP...${NC}"
+    echo -e "  ${GREEN}  [1]${NC} 安装 WARP CLI"
+    echo -e "  ${GREEN}  [2]${NC} 管理 WARP (warp-cli)"
+    echo -e "  ${GREEN}  [3]${NC} 安装 WGCF (WireGuard 配置生成)"
+    echo -ne "  ${BOLD}请选择${NC} > "; read WW
+    case "$WW" in
+        1)
+            curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg 2>/dev/null
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs 2>/dev/null || echo 'bookworm') main" > /etc/apt/sources.list.d/cloudflare-client.list
+            apt update && apt install -y cloudflare-warp
+            print_done "WARP CLI 安装"
+            echo -e "  注册: ${CYAN}warp-cli register${NC}"
+            echo -e "  连接: ${CYAN}warp-cli connect${NC}"
+            ;;
+        2)
+            echo -e "  ${CYAN}warp-cli status${NC}"; warp-cli status 2>/dev/null || print_warn "WARP 未安装"
+            echo -ne "  [c]连接 [d]断开 [q]退出 > "; read WCMD
+            case "$WCMD" in c) warp-cli connect 2>/dev/null ;; d) warp-cli disconnect 2>/dev/null ;; esac
+            ;;
+        3)
+            apt install -y wireguard-tools resolvconf 2>/dev/null || true
+            wget -O /usr/local/bin/wgcf "https://github.com/ViRb3/wgcf/releases/latest/download/wgcf_linux_amd64" 2>/dev/null
+            chmod +x /usr/local/bin/wgcf 2>/dev/null
+            print_done "WGCF 安装"
+            echo -e "  使用: ${CYAN}wgcf register && wgcf generate && wg-quick up wgcf-profile.conf${NC}"
+            ;;
+        *) echo -e "  ${RED}无效选项${NC}" ;;
+    esac
+}
+
+# ---- WireGuard ----
+install_wireguard() {
+    echo -e "\n  ${BOLD}正在安装 WireGuard...${NC}"
+    apt install -y wireguard wireguard-tools resolvconf 2>/dev/null || true
+    mkdir -p /etc/wireguard
+    # 生成密钥
+    if [ ! -f /etc/wireguard/server_private.key ]; then
+        wg genkey | tee /etc/wireguard/server_private.key | wg pubkey > /etc/wireguard/server_public.key
+        echo -e "  ${GREEN}已生成密钥${NC}"
+    fi
+    print_done "WireGuard 安装"
+    echo -e "  私钥: ${CYAN}/etc/wireguard/server_private.key${NC}"
+    echo -e "  公钥: ${CYAN}$(cat /etc/wireguard/server_public.key 2>/dev/null)${NC}"
+}
+
+# ---- wg-easy (Docker Web管理WireGuard) ----
+install_wgeasy() {
+    echo -e "\n  ${BOLD}正在部署 wg-easy...${NC}"
+    if ! command -v docker &>/dev/null; then
+        print_warn "需要 Docker，请先安装 Docker"
+        install_docker
+    fi
+    read -p "  请输入 Web 管理端口 (默认 51821): " WGE_PORT; WGE_PORT=${WGE_PORT:-51821}
+    read -p "  请输入 WireGuard 端口 (默认 51820): " WGE_WG; WGE_WG=${WGE_WG:-51820}
+    read -rsp "  请输入 Web 管理密码: " WGE_PASS; echo
+    [ -z "$WGE_PASS" ] && WGE_PASS="pikash"
+
+    docker rm -f wg-easy 2>/dev/null || true
+    docker run -d --name wg-easy \
+        --restart=always --cap-add=NET_ADMIN --cap-add=SYS_MODULE \
+        --sysctl="net.ipv4.conf.all.src_valid_mark=1" \
+        --sysctl="net.ipv4.ip_forward=1" \
+        -p "${WGE_PORT}:51821" -p "${WGE_WG}:51820/udp" \
+        -e WG_HOST="$(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_IP')" \
+        -e PASSWORD="${WGE_PASS}" \
+        -v /opt/wg-easy:/etc/wireguard \
+        weejewel/wg-easy
+    print_done "wg-easy 部署"
+    echo -e "  Web 面板: ${CYAN}http://$(curl -s ifconfig.me 2>/dev/null):${WGE_PORT}${NC}"
+    echo -e "  密码: ${PASSWORD_HIDE:-$WGE_PASS}"
+}
+
+# ---- 3X-UI (独立安装) ----
+install_3xui() {
+    echo -e "\n  ${BOLD}正在安装 3X-UI 面板...${NC}"
+    bash <(curl -sL "https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh")
+}
+
+# ============================================================
+# 子菜单 1: 一键部署
 # ============================================================
 sub_deploy() {
     clear_screen; print_header
     echo -e "  ${BOLD}${CYAN}  ◀ 主菜单                          [1] 一键部署 ▶${NC}"
     print_line
-
     print_section "系统环境"
-    print_item "1"  "系统更新 + 基础工具"       "apt update/upgrade, curl/wget/git/htop/vim"
-    print_item "2"  "配置 ProxyChains4"         "SOCKS5 代理链，加速后续下载"
-
-    print_section "面板与探针"
-    print_item "3"  "安装 Node.js LTS + PM2"    "NVM 安装，npmmirror 源"
-    print_item "4"  "安装宝塔面板"              "自动配置用户名密码端口"
-    print_item "5"  "安装哪吒探针"              "Agent 自动注册到服务端"
-    print_item "6"  "安装 3X-UI 面板"           "Xray-core 多协议代理面板"
-
+    print_item "1"  "更换大陆镜像源"           "Debian(Ubuntu)USTC / CentOS(Aliyun)"
+    print_item "2"  "系统更新 + 基础工具"       "curl/wget/git/htop/vim/unzip"
+    print_item "3"  "安装 Docker + 镜像加速"    "1ms.run 国内镜像源"
+    print_item "4"  "安装 Podman + 镜像加速"    "1ms.run 国内镜像源"
+    print_section "面板安装"
+    print_item "5"  "安装宝塔面板"              "经典 Linux 面板"
+    print_item "6"  "安装 1Panel"               "现代化开源面板"
+    print_item "7"  "安装 FRP Panel"            "内网穿透面板 (PM2)"
+    print_item "8"  "安装 NetPanel"             "轻量服务器管理面板"
+    print_item "9"  "安装哪吒探针"              "Agent 自动注册"
+    print_item "10" "安装 Node.js LTS + PM2"    "NVM + npmmirror 源"
     print_section "组网与中转"
-    print_item "7"  "安装 EasyTier"             "去中心化 P2P 组网 (PM2)"
-    print_item "8"  "安装 FRP Panel"            "内网穿透面板 (PM2)"
-    print_item "9"  "安装 RustDesk 中转"        "远程桌面中继服务器"
-    print_item "10" "安装 ZeroTier"             "虚拟局域网组网"
-    print_item "11" "安装 Tailscale"            "WireGuard 组网"
-
+    print_item "11" "安装 EasyTier"             "去中心化 P2P 组网"
+    print_item "12" "安装 RustDesk 中转"        "远程桌面中继服务器"
+    print_item "13" "安装 ZeroTier"             "虚拟局域网组网"
+    print_item "14" "安装 Tailscale"            "WireGuard 组网"
     print_line
     print_item "A"  "全部部署（依次询问）"      ""
     print_item "0"  "返回主菜单"                ""
@@ -104,33 +354,37 @@ sub_deploy() {
 
 exec_deploy() {
     case "$1" in
-        1) run_setup 1 ;;       # 系统初始化
-        2) run_setup 2 ;;       # ProxyChains4
-        3) run_setup 3 ;;       # Node.js
-        4) run_setup 4 ;;       # 宝塔
-        5) run_setup 5 ;;       # 哪吒
-        6) run_setup 6 ;;       # 3X-UI
-        7) run_setup 7 ;;       # EasyTier
-        8) run_setup 8 ;;       # FRP
-        9) run_setup A ;;       # RustDesk
-        10) run_setup B ;;      # ZeroTier
-        11) run_setup C ;;      # Tailscale
-        A|a) run_setup ALL ;;   # 全部
-        0) return 1 ;;
-        *) echo -e "  ${RED}无效选项: $1${NC}" ;;
-    esac
-    return 0
+        1)  switch_apt_mirror ;;
+        2)  run_setup 1 ;;
+        3)  install_docker ;;
+        4)  install_podman ;;
+        5)  run_setup 4 ;;
+        6)  install_1panel ;;
+        7)  run_setup 8 ;;
+        8)  install_netpanel ;;
+        9)  run_setup 5 ;;
+        10) run_setup 3 ;;
+        11) run_setup 7 ;;
+        12) run_setup A ;;
+        13) run_setup B ;;
+        14) run_setup C ;;
+        A|a) run_setup ALL ;;
+        0)  return 1 ;;
+        *)  echo -e "  ${RED}无效: $1${NC}" ;;
+    esac; return 0
 }
 
 # ============================================================
-# 子菜单：日常维护
+# 子菜单 2: 日常维护
 # ============================================================
 sub_maintain() {
     clear_screen; print_header
     echo -e "  ${BOLD}${CYAN}  ◀ 主菜单                          [2] 日常维护 ▶${NC}"
     print_line
-    print_item "1"  "系统清理"                  "清理 apt 缓存、journal 日志、Docker 垃圾、bash 历史"
-    print_item "2"  "端口限速"                  "tc+IFB 双向限速，支持端口范围和自定义速率"
+    print_item "1"  "系统垃圾清理"              "apt缓存/journal/Docker/bash历史"
+    print_item "2"  "端口限速"                  "tc+IFB 双向限速(自定义端口/速率)"
+    print_item "3"  "屏蔽地区 (BlockAreaBot)"   "一键屏蔽指定国家/地区 IP"
+    print_item "4"  "升级/替换内核"             "XanMod/Liquorix/Backports/HWE"
     print_line
     print_item "0"  "返回主菜单"                ""
     print_line
@@ -140,15 +394,16 @@ sub_maintain() {
 exec_maintain() {
     case "$1" in
         1) run_clean ;;
-        2) run_setup 9 ;;    # 端口限速
+        2) run_setup 9 ;;
+        3) block_area_bot ;;
+        4) upgrade_kernel ;;
         0) return 1 ;;
-        *) echo -e "  ${RED}无效选项: $1${NC}" ;;
-    esac
-    return 0
+        *) echo -e "  ${RED}无效: $1${NC}" ;;
+    esac; return 0
 }
 
 # ============================================================
-# 子菜单：桌面安装
+# 子菜单 3: 桌面安装
 # ============================================================
 sub_desktop() {
     clear_screen; print_header
@@ -156,11 +411,9 @@ sub_desktop() {
     print_line
     print_tip "安装顺序: 基础环境 → X11图形栈 → 选择桌面"
     print_line
-
     print_section "前置层"
-    print_item "1"  "Server 基础环境"           "换 USTC 源、SSH、sudo/vim/git 等"
+    print_item "1"  "Server 基础环境"           "换 USTC 源、SSH、sudo/vim/git"
     print_item "2"  "X11 图形栈"                "Xserver + NoMachine 远程桌面"
-
     print_section "桌面环境"
     print_item "3"  "Deepin / GXDE"             "中文友好、美观的 Deepin 风格"
     print_item "4"  "KDE Plasma"                "高度可定制的现代桌面"
@@ -168,9 +421,8 @@ sub_desktop() {
     print_item "6"  "Xfce 轻量桌面"             "资源占用低、稳定流畅"
     print_item "7"  "GNOME 3"                   "简洁现代的工作流桌面"
     print_item "8"  "MATE 经典"                 "传统菜单风格、稳定耐用"
-
     print_line
-    print_item "A"  "全套安装"                  "基础→图形→自选桌面（依次引导）"
+    print_item "A"  "全套安装"                  "基础→图形→自选桌面"
     print_item "0"  "返回主菜单"                ""
     print_line
     echo -ne "  ${BOLD}请输入选项${NC} > "
@@ -186,46 +438,38 @@ exec_desktop() {
         6) run_script_pipe "Linux/Desktop/LXC-Debian-Xfce4L.sh" ;;
         7) run_script_pipe "Linux/Desktop/LXC-Debian-Gnome3.sh" ;;
         8) run_script_pipe "Linux/Desktop/LXC-Debian-MateDE.sh" ;;
-        A|a)
-            echo -e "  ${GREEN}开始全套安装...${NC}"
-            run_script_pipe "Linux/Desktop/LXC-Debian-Server.sh"
-            run_script_pipe "Linux/Desktop/LXC-Debian-Graphy.sh"
-            echo -ne "  ${BOLD}请选择桌面 (3-8)${NC} > "; read DD
-            exec_desktop "$DD"
-            ;;
+        A|a) run_script_pipe "Linux/Desktop/LXC-Debian-Server.sh"
+             run_script_pipe "Linux/Desktop/LXC-Debian-Graphy.sh"
+             echo -ne "  ${BOLD}请选择桌面 (3-8)${NC} > "; read DD; exec_desktop "$DD" ;;
         0) return 1 ;;
-        *) echo -e "  ${RED}无效选项: $1${NC}" ;;
-    esac
-    return 0
+        *) echo -e "  ${RED}无效: $1${NC}" ;;
+    esac; return 0
 }
 
 # ============================================================
-# 子菜单：性能测评
+# 子菜单 4: 性能测评
 # ============================================================
 sub_bench() {
     clear_screen; print_header
     echo -e "  ${BOLD}${CYAN}  ◀ 主菜单                          [4] 性能测评 ▶${NC}"
     print_line
-
     print_section "综合测评"
-    print_item "1"  "融合怪 综合测评"           "CPU/内存/磁盘/网络/流媒体 全面检测"
-    print_item "2"  "IP 质量体检"               "多数据库风险评分 + 流媒体 + 邮局"
-    print_item "3"  "LemonBench"                "CPU/内存/磁盘/网络 基准测试"
-    print_item "4"  "YABS 基准测试"             "iperf3 + Geekbench + fio"
-    print_item "5"  "UnixBench"                 "类Unix系统综合性能跑分"
-    print_item "6"  "Bench.sh (秋水逸冰)"       "系统信息 + IO + 网速基准"
-    print_item "7"  "SuperBench"                "系统信息 + IO + 全国测速"
-    print_item "8"  "SuperSpeed"                "全国三网 Speedtest 全面测速"
-
+    print_item "1"  "融合怪 综合测评"           "CPU/内存/磁盘/网络/流媒体"
+    print_item "2"  "IP 质量体检"               "多数据库风险评分+流媒体+邮局"
+    print_item "3"  "LemonBench"                "CPU/内存/磁盘/网络基准"
+    print_item "4"  "YABS 基准测试"             "iperf3+Geekbench+fio"
+    print_item "5"  "UnixBench"                 "类Unix综合性能跑分"
+    print_item "6"  "Bench.sh (秋水逸冰)"       "系统信息+IO+网速"
+    print_item "7"  "SuperBench"                "系统信息+IO+全国测速"
+    print_item "8"  "SuperSpeed"                "三网Speedtest全面测速"
     print_section "网络诊断"
-    print_item "9"  "BackTrace 回程路由"        "三网回程路由自动测试"
-    print_item "10" "SuperTrace"                "北上广三大运营商路由追踪"
-    print_item "11" "BestTrace (IPIP)"          "IPIP.net 交互式路由追踪"
-    print_item "12" "mPing 全国延迟"            "全国多地域 Ping 测试"
-    print_item "13" "PrettyPing"                "彩色图形化 Ping 输出"
-
+    print_item "9"  "BackTrace 回程路由"        "三网回程路由"
+    print_item "10" "SuperTrace"                "北上广路由追踪"
+    print_item "11" "BestTrace (IPIP)"          "IPIP.net交互式路由"
+    print_item "12" "mPing 全国延迟"            "全国多地域Ping"
+    print_item "13" "PrettyPing"                "彩色图形化Ping"
     print_line
-    print_item "A"  "全部跑一遍"                "依次执行全部测评（耗时长）"
+    print_item "A"  "全部跑一遍"                "依次执行（耗时长）"
     print_item "0"  "返回主菜单"                ""
     print_line
     echo -ne "  ${BOLD}请输入选项${NC} > "
@@ -233,29 +477,61 @@ sub_bench() {
 
 exec_bench() {
     case "$1" in
-        1)  run_bench "ecss-bench.sh" ;;
-        2)  run_bench "ip-quality.sh" ;;
-        3)  run_bench "lemonbench.sh" ;;
-        4)  run_bench "yabs-bench.sh" ;;
-        5)  run_bench "unix-bench.sh" ;;
-        6)  run_bench "qsyb-bench.sh" ;;
-        7)  run_bench "superbench.sh" ;;
-        8)  run_bench "superspeed.sh" ;;
-        9)  run_bench "back-trace.sh" ;;
-        10) run_bench "supertrace.sh" ;;
-        11) run_bench "best-trace.sh" ;;
-        12) run_bench "mping-test.sh" ;;
-        13) run_bench "prettyping.sh" ;;
-        A|a)
-            for S in ecss-bench.sh ip-quality.sh superbench.sh superspeed.sh back-trace.sh; do
-                echo -e "\n  ${YELLOW}>>> 运行: $S${NC}"
-                run_bench "$S"
-            done
-            ;;
+        1) run_bench "ecss-bench.sh";; 2) run_bench "ip-quality.sh";;
+        3) run_bench "lemonbench.sh";; 4) run_bench "yabs-bench.sh";;
+        5) run_bench "unix-bench.sh";; 6) run_bench "qsyb-bench.sh";;
+        7) run_bench "superbench.sh";; 8) run_bench "superspeed.sh";;
+        9) run_bench "back-trace.sh";; 10) run_bench "supertrace.sh";;
+        11) run_bench "best-trace.sh";; 12) run_bench "mping-test.sh";;
+        13) run_bench "prettyping.sh";;
+        A|a) for S in ecss-bench.sh ip-quality.sh superbench.sh superspeed.sh back-trace.sh; do
+                echo -e "\n  ${YELLOW}>>> 运行: $S${NC}"; run_bench "$S"; done ;;
         0) return 1 ;;
-        *) echo -e "  ${RED}无效选项: $1${NC}" ;;
-    esac
-    return 0
+        *) echo -e "  ${RED}无效: $1${NC}" ;;
+    esac; return 0
+}
+
+# ============================================================
+# 子菜单 5: 代理配置
+# ============================================================
+sub_proxy() {
+    clear_screen; print_header
+    echo -e "  ${BOLD}${CYAN}  ◀ 主菜单                          [5] 代理配置 ▶${NC}"
+    print_line
+
+    print_section "面板管理"
+    print_item "1"  "安装 3X-UI 面板"           "Xray-core 多协议 Web 面板"
+
+    print_section "代理协议一键部署"
+    print_item "2"  "Clash for Linux"           "基于 Clash 的代理客户端"
+    print_item "3"  "Hysteria2 (HY2)"           "高速 UDP 代理协议"
+    print_item "4"  "Shadowsocks-rust"          "经典 Shadowsocks (Rust版)"
+    print_item "5"  "Trojan-Go"                 "Trojan 协议的 Go 实现"
+
+    print_section "组网与加速"
+    print_item "6"  "Cloudflare WARP"           "WARP CLI / WGCF 一键部署+管理"
+    print_item "7"  "WireGuard 部署"            "原生 WireGuard 安装+密钥生成"
+    print_item "8"  "wg-easy 部署"              "Docker Web 管理 WireGuard"
+
+    print_line
+    print_item "0"  "返回主菜单"                ""
+    print_line
+    echo -ne "  ${BOLD}请输入选项${NC} > "
+}
+
+exec_proxy() {
+    case "$1" in
+        1) install_3xui ;;
+        2) install_clash_linux ;;
+        3) install_hy2 ;;
+        4) install_shadowsocks ;;
+        5) install_trojan ;;
+        6) install_warp ;;
+        7) install_wireguard ;;
+        8) install_wgeasy ;;
+        0) return 1 ;;
+        *) echo -e "  ${RED}无效: $1${NC}" ;;
+    esac; return 0
 }
 
 # ============================================================
@@ -264,17 +540,18 @@ exec_bench() {
 main_menu() {
     clear_screen; print_header
     print_line
-    print_item "1"  "🖥️ 一键部署"             "一键换源/面板/探针/组网/中转"
-    print_item "2"  "🔧 日常维护"             "垃圾清理/限速/更新/屏蔽/加速"
-    print_item "3"  "🎨 桌面安装"             "桌面安装/配置/更新/维护/卸载"
-    print_item "4"  "📊 性能测评"             "测评性能/网络/线路/延迟/回程"
+    print_item "1"  "🖥️  一键部署"               "一键换源/面板/探针/组网/中转"
+    print_item "2"  "🔧 日常维护"               "垃圾清理/限速/更新/屏蔽/加速"
+    print_item "3"  "🎨 桌面安装"               "桌面安装/配置/更新/维护/卸载"
+    print_item "4"  "📊 性能测评"               "测评性能/网络/线路/延迟/回程"
+    print_item "5"  "🌐 代理配置"               "配置代理/出站/入站/WARP/SOCK"
     print_line
     print_item "0"  "退出"                      ""
     print_line
     echo -ne "  ${BOLD}请选择${NC} > "
 }
 
-# ---- Windows 菜单 ----
+# ---- Windows ----
 windows_menu() {
     clear_screen; print_header
     print_line
@@ -284,7 +561,6 @@ windows_menu() {
     print_item "10" "Windows / Office 激活"     "MAS AIO 全功能激活"
     print_line
     print_tip "Windows 脚本需在 PowerShell (管理员) 中运行"
-    print_tip "当前为 Git Bash，将显示 PowerShell 命令"
     print_line
     print_item "0"  "退出"                      ""
     print_line
@@ -293,45 +569,31 @@ windows_menu() {
 
 show_windows_cmd() {
     case "$1" in
-        1)  echo -e "  ${GREEN}PowerShell 管理员执行:${NC}"
-            echo -e "  ${CYAN}irm ${CDN_BASE}/WinNT/Docker/Winx86-dockerce.ps1 | iex${NC}" ;;
-        2)  echo -e "  ${GREEN}PowerShell 管理员执行:${NC}"
-            echo -e "  ${CYAN}irm ${CDN_BASE}/WinNT/Docker/Winx86-mirantis.ps1 | iex${NC}" ;;
-        3)  echo -e "  ${GREEN}PowerShell 管理员执行:${NC}"
-            echo -e "  ${CYAN}irm ${CDN_BASE}/WinNT/Docker/Winx86-nerdctls.ps1 | iex${NC}" ;;
-        10) echo -e "  ${GREEN}PowerShell 管理员执行:${NC}"
-            echo -e "  ${CYAN}irm ${CDN_BASE}/WinNT/Active/MAS_AIO.cmd | iex${NC}" ;;
+        1)  echo -e "  ${GREEN}PowerShell:${NC} irm ${CDN_BASE}/WinNT/Docker/Winx86-dockerce.ps1 | iex" ;;
+        2)  echo -e "  ${GREEN}PowerShell:${NC} irm ${CDN_BASE}/WinNT/Docker/Winx86-mirantis.ps1 | iex" ;;
+        3)  echo -e "  ${GREEN}PowerShell:${NC} irm ${CDN_BASE}/WinNT/Docker/Winx86-nerdctls.ps1 | iex" ;;
+        10) echo -e "  ${GREEN}PowerShell:${NC} irm ${CDN_BASE}/WinNT/Active/MAS_AIO.cmd | iex" ;;
         0)  return 1 ;;
-        *)  echo -e "  ${RED}无效选项: $1${NC}" ;;
-    esac
-    return 0
+        *)  echo -e "  ${RED}无效: $1${NC}" ;;
+    esac; return 0
 }
 
 # ============================================================
 # 主流程
 # ============================================================
-
 run_submenu() {
-    local CATEGORY="$1"
-    local CHOICE
+    local CAT="$1"; local CHOICE
     while true; do
-        case "$CATEGORY" in
-            1) sub_deploy ;;
-            2) sub_maintain ;;
-            3) sub_desktop ;;
-            4) sub_bench ;;
+        case "$CAT" in
+            1) sub_deploy;; 2) sub_maintain;; 3) sub_desktop;; 4) sub_bench;; 5) sub_proxy;;
         esac
-        read CHOICE
-        [ -z "$CHOICE" ] && continue
-        case "$CATEGORY" in
-            1) exec_deploy "$CHOICE" || break ;;
-            2) exec_maintain "$CHOICE" || break ;;
-            3) exec_desktop "$CHOICE" || break ;;
-            4) exec_bench "$CHOICE" || break ;;
+        read CHOICE; [ -z "$CHOICE" ] && continue
+        case "$CAT" in
+            1) exec_deploy "$CHOICE" || break ;;  2) exec_maintain "$CHOICE" || break ;;
+            3) exec_desktop "$CHOICE" || break ;;  4) exec_bench "$CHOICE" || break ;;
+            5) exec_proxy "$CHOICE" || break ;;
         esac
-        echo ""
-        echo -ne "  ${BOLD}按 Enter 继续，输入 0 返回${NC} > "
-        read NEXT
+        echo ""; echo -ne "  ${BOLD}按 Enter 继续，输入 0 返回${NC} > "; read NEXT
         [ "$NEXT" = "0" ] && break
     done
 }
@@ -341,28 +603,19 @@ main() {
         case "$OS_TYPE" in
             linux)   main_menu ;;
             windows) windows_menu ;;
-            *)
-                echo -e "${RED}不支持的系统: ${OS_DETAIL}${NC}"
-                echo "项目: https://github.com/PIKACHUIM/CloudScripts"
-                exit 1
-                ;;
+            *) echo -e "${RED}不支持的系统${NC}"; echo "https://github.com/PIKACHUIM/CloudScripts"; exit 1 ;;
         esac
-
-        read CHOICE
-        [ -z "$CHOICE" ] && continue
-
+        read CHOICE; [ -z "$CHOICE" ] && continue
         case "$OS_TYPE" in
             linux)
                 case "$CHOICE" in
-                    1|2|3|4) run_submenu "$CHOICE" ;;
+                    1|2|3|4|5) run_submenu "$CHOICE" ;;
                     0) echo -e "${GREEN}再见！${NC}"; exit 0 ;;
                     *) echo -e "  ${RED}无效选项${NC}" ;;
-                esac
-                ;;
+                esac ;;
             windows)
                 show_windows_cmd "$CHOICE" || { echo -e "${GREEN}再见！${NC}"; exit 0; }
-                echo ""; echo -ne "  ${BOLD}按 Enter 继续${NC} > "; read _
-                ;;
+                echo ""; echo -ne "  ${BOLD}按 Enter 继续${NC} > "; read _ ;;
         esac
     done
 }
