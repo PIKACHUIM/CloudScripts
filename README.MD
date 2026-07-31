@@ -32,7 +32,7 @@ bash <(curl -s https://pikash.opkg.cn/Menu.sh)
 
 > 🌐 **GitHub 直连**（备用）：
 > ```bash
-> bash <(curl -s https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
+> bash <(curl -s https://ghfile.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
 > ```
 
 ### 菜单一览

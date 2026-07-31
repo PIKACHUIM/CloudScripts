@@ -113,7 +113,7 @@ _load_lib() {
 
 # ---- Module loader (lazy, caches to /var/cache/pika-sh/modules) ----
 _load_module() {
-    local mod="$1"  # e.g., "deploy.sh"
+    local mod="$1"
     local cache_dir="${PIKA_CACHE_DIR}/modules"
     mkdir -p "$cache_dir"
 
@@ -124,7 +124,7 @@ _load_module() {
         return
     fi
 
-    # Always try to fetch fresh; only use cache as offline fallback
+    # Try fetching from CDN
     local cached="${cache_dir}/${mod}"
     if pika_fetch "Linux/Modules/${mod}" -o "$cached.tmp" 2>/dev/null; then
         mv -f "$cached.tmp" "$cached"
@@ -132,13 +132,21 @@ _load_module() {
         return
     fi
 
-    # No network — use stale cache if available
+    # Fallback: raw.githubusercontent.com (always up-to-date)
+    local raw_url="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Modules/${mod}"
+    if curl -fsSL "$raw_url" -o "$cached.tmp" 2>/dev/null || wget -qO "$cached.tmp" "$raw_url" 2>/dev/null; then
+        mv -f "$cached.tmp" "$cached"
+        . "$cached"
+        return
+    fi
+
+    # Last resort: stale local cache
     if [ -f "$cached" ]; then
         . "$cached"
         return
     fi
 
-    pika_err "Failed to load module: $mod"
+    pika_err "$(t 'common.error'): module $mod"
     return 1
 }
 
