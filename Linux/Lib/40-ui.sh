@@ -151,7 +151,7 @@ ui_section() {
 
 # ---- Divider ----
 ui_divider() {
-    printf '  %s%s%s\n' "${PIKA_CYAN}" '────────--────────────────────────────────────────────────' "${PIKA_NC}"
+    printf '  %s%s%s\n' "${PIKA_CYAN}" '──────────────────────────────────────────────────────────' "${PIKA_NC}"
 }
 
 # ---- System info block (compact neofetch-lite) ----
@@ -294,7 +294,7 @@ ui_dispatch() {
 # ============================================================
 ui_confirm_install() {
     local name="$1" desc="${2:-}" version="${3:-}" url="${4:-}"
-    local line='─────────────────────----─────────────────'
+    local line='─────────────────────────────────────────'
 
     printf '\n'
     printf '  %s┌%s┐%s\n' "${PIKA_CYAN}" "$line" "${PIKA_NC}"
