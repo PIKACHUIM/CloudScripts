@@ -30,7 +30,7 @@ debian|ubuntu)
         eval "$PKG_INSTALL gnome-shell gnome-remote-desktop gnome-keyring \
         pipewire pipewire-pulse openssl sudo"
     else
-        eval "$PKG_INSTALL gnome-core cmake git sudo pulseaudio-"
+        eval "$PKG_INSTALL gnome-core cmake git sudo pulseaudio"
     fi
     ;;
 fedora)

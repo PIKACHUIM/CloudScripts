@@ -38,28 +38,38 @@ do_proxy_xui() {
 }
 
 do_proxy_clash() {
+    ui_confirm_install "Clash for Linux" "$(t 'proxy.clash.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/clash/install.sh")
     curl -fsSL "$url" | bash -e
+    pika_info "$(t 'common.done') - Clash"
 }
 
 do_proxy_hysteria2() {
+    ui_confirm_install "Hysteria2" "$(t 'proxy.hysteria2.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/hysteria2/install.sh")
     curl -fsSL "$url" | bash -e
+    pika_info "$(t 'common.done') - Hysteria2"
 }
 
 do_proxy_ssrust() {
+    ui_confirm_install "Shadowsocks-rust" "$(t 'proxy.ssrust.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/ss-rust/install.sh")
     curl -fsSL "$url" | bash -e
+    pika_info "$(t 'common.done') - Shadowsocks-rust"
 }
 
 do_proxy_trojango() {
+    ui_confirm_install "Trojan-Go" "$(t 'proxy.trojango.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/trojan-go/install.sh")
     curl -fsSL "$url" | bash -e
+    pika_info "$(t 'common.done') - Trojan-Go"
 }
 
 do_proxy_warp() {
+    ui_confirm_install "Cloudflare WARP" "$(t 'proxy.warp.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/warp/install.sh")
     curl -fsSL "$url" | bash -e
+    pika_info "$(t 'common.done') - WARP"
 }
 
 do_proxy_wireguard() {
@@ -68,6 +78,7 @@ do_proxy_wireguard() {
 }
 
 do_proxy_wgeasy() {
+    command -v docker >/dev/null 2>&1 || { pika_err "Docker 未安装，请先执行 部署安装 > 安装 Docker"; return 1; }
     ui_confirm_install "wg-easy" "$(t 'proxy.wgeasy.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     local port wgport pass
     read -r -p "$(t 'proxy.wgeasy.port') [51821]: " port; port="${port:-51821}"

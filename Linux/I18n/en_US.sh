@@ -187,6 +187,7 @@ T_ui_no="No"
 T_ui_select="Select"
 T_ui_invalid="Invalid option"
 T_ui_press_enter="Press Enter to continue..."
+T_ui_nohandler="Handler not found"
 
 # ---- States ----
 T_state_installing="Installing"

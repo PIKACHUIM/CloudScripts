@@ -106,7 +106,8 @@ do_netpanel() {
     ui_confirm_install "NetPanel" "$(t 'deploy.panel.netpanel.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') NetPanel..."
     pkg_install curl wget
-    curl -fsSL https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/netpanel/install.sh | bash -e
+    local netpanel_url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/netpanel/install.sh")
+    curl -fsSL "$netpanel_url" | bash -e
 }
 
 do_easytier() {

@@ -62,4 +62,4 @@ echo '/etc/NX/nxserver --startup'               >> /run.sh
 echo '/etc/NX/nxserver --restart'               >> /run.sh
 echo 'echo Starting VNC ---------------------'  >> /run.sh
 echo 'export HOME=/root && bash /x11vnc.sh   '  >> /run.sh
-de_finish 9
+echo 9 > /etc/lxc-de-flag
