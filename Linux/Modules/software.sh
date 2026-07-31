@@ -74,9 +74,6 @@ SoftwareMENU=(
     "speedtest|software.speedtest|software.speedtest.desc|do_soft_speedtest"
     "mcsmanager|software.mcsmanager|software.mcsmanager.desc|do_soft_mcsmanager"
 )
-    "speedtest|software.speedtest|software.speedtest.desc|do_soft_speedtest"
-    "mcsmanager|software.mcsmanager|software.mcsmanager.desc|do_soft_mcsmanager"
-)
 
 # ─── Shared helpers ──────────────────────────────────────────
 _soft_ensure_docker() {
