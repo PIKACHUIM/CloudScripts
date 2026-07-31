@@ -55,6 +55,51 @@ _ui_repeat_char() {
     printf '%s' "$s"
 }
 
+# ---- Pad/truncate a string to a target display width (CJK-aware) ----
+_ui_str_pad() {
+    local s="$1" target="$2"
+    if command -v python3 >/dev/null 2>&1 && python3 -c "" 2>/dev/null; then
+        python3 -c "
+import sys, unicodedata
+s=sys.argv[1]; target=int(sys.argv[2])
+w=0; out=[]
+for c in s:
+    cw=2 if unicodedata.east_asian_width(c) in ('W','F') else 1
+    if w+cw>target:
+        break
+    out.append(c); w+=cw
+sys.stdout.write(''.join(out) + ' '*(target-w))
+" -- "$s" "$target" 2>/dev/null && return
+    fi
+    # Fallback: 3-byte+ lead bytes are wide (CJK)
+    local _lc="${LC_ALL-__N__}"; LC_ALL=C
+    local leads="${s//[$'\x80'-$'\xbf']/}"
+    local chars=${#leads}
+    local wides="${leads//[!$'\xe0'-$'\xf7']/}"
+    local wide=${#wides}
+    [ "$_lc" = "__N__" ] && unset LC_ALL || LC_ALL="$_lc"
+    local cur=$((chars + wide))
+    if [ "$cur" -ge "$target" ]; then
+        # Truncate
+        local i=0 out=""
+        local _lc2="${LC_ALL-__N__}"; LC_ALL=C
+        local w2=0
+        for ((i=0; i<chars; i++)); do
+            local ch="${leads:$i:1}"
+            local cw=1
+            case "$ch" in [$'\xe0'-$'\xf7']) cw=2 ;; esac
+            [ $((w2 + cw)) -gt "$target" ] && break
+            out="${out}${ch}"
+            w2=$((w2 + cw))
+        done
+        [ "$_lc2" = "__N__" ] && unset LC_ALL || LC_ALL="$_lc2"
+        printf '%s' "$out"
+    else
+        # Pad with spaces
+        printf '%s%*s' "$s" $((target - cur)) ''
+    fi
+}
+
 # ---- Terminal width ----
 _pika_term_width() {
     local w="${COLUMNS:-}"
@@ -94,7 +139,7 @@ ui_header() {
   ║   ██║     ██║██║  ██╗██║  ██║    ███████║ ██║  ██║     ║
   ║   ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝    ╚══════╝ ╚═╝  ╚═╝     ║
   ║                                                        ║
-  ║             ${Y}皮卡Linux在线脚本 ${ver}${C}                     ║
+  ║             ${Y}皮卡Linux在线脚本 ${ver}${C}                    ║
   ╚════════════════════════════════════════════════════════╝${N}
 "
 }
@@ -106,7 +151,7 @@ ui_section() {
 
 # ---- Divider ----
 ui_divider() {
-    printf '  %s%s%s\n' "${PIKA_CYAN}" '──────────────────────────────────────────────────────' "${PIKA_NC}"
+    printf '  %s%s%s\n' "${PIKA_CYAN}" '────────────────────────────────────────────────────────' "${PIKA_NC}"
 }
 
 # ---- System info block (compact neofetch-lite) ----
@@ -167,22 +212,21 @@ ${N}"
 # ============================================================
 ui_item() {
     local num="$1" name="$2" desc="${3:-}"
-    # Column layout:  2 (indent) + 4 ([N]) + 2 (gap) + name_col + 2 (gap) = desc starts at col 10+name_col
-    local name_col=22    # display width reserved for the name column
-    local name_w; name_w=$(_ui_str_width "$name")
-    local pad=$((name_col - name_w))
-    [ "$pad" -lt 2 ] && pad=2
-    local spacing; spacing=$(printf '%*s' "$pad" '')
+    # Column layout:  2 (indent) + 4 ([N]) + 2 (gap) + name_col (14) + 2 (gap) + desc_col (32) = 56 cols
+    local name_col=14
+    local desc_col=32
+    local name_padded; name_padded=$(_ui_str_pad "$name" "$name_col")
+    local desc_padded; desc_padded=$(_ui_str_pad "$desc" "$desc_col")
 
     if [ -n "$desc" ]; then
-        printf '  %s%4s%s  %s%s%s%s  %s%s%s\n' \
+        printf '  %s%4s%s  %s%s%s  %s%s%s\n' \
             "${PIKA_GREEN}" "[$num]" "${PIKA_NC}" \
-            "${PIKA_BOLD}" "$name" "${PIKA_NC}" "$spacing" \
-            "${PIKA_BLUE}" "$desc" "${PIKA_NC}"
+            "${PIKA_BOLD}" "$name_padded" "${PIKA_NC}" \
+            "${PIKA_BLUE}" "$desc_padded" "${PIKA_NC}"
     else
         printf '  %s%4s%s  %s%s%s\n' \
             "${PIKA_GREEN}" "[$num]" "${PIKA_NC}" \
-            "${PIKA_BOLD}" "$name" "${PIKA_NC}"
+            "${PIKA_BOLD}" "$name_padded" "${PIKA_NC}"
     fi
 }
 

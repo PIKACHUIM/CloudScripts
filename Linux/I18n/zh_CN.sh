@@ -30,7 +30,7 @@ T_menu_system="系统工具"
 T_menu_system_desc="SSH加固、时区、自更新、卸载"
 T_menu_prompt="请选择 [0=返回]: "
 T_menu_back="返回上级"
-T_menu_exit="退出"
+T_menu_exit="退出脚本"
 
 # ---- Deploy submenu ----
 T_deploy_mirror="更换镜像源"
