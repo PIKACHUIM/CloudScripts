@@ -31,6 +31,12 @@ T_menu_system_desc="SSH hardening, time sync, updater, uninstall"
 T_menu_prompt="Select [0=Back]: "
 T_menu_back="Back"
 T_menu_exit="Exit"
+T_menu_install_local="Install Locally"
+T_menu_install_local_desc="Install to /usr/local/bin/pikash for local use"
+T_menu_install_local_fetching="Downloading"
+T_menu_install_local_success="Installation successful"
+T_menu_install_local_failed="Installation failed, check network"
+T_menu_install_local_usage="Usage"
 
 # ---- Deploy submenu ----
 T_deploy_mirror="Switch Mirror Source"

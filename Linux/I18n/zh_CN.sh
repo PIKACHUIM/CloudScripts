@@ -31,6 +31,12 @@ T_menu_system_desc="SSH加固、时区、自更新、卸载"
 T_menu_prompt="请选择 [0=返回]: "
 T_menu_back="返回上级"
 T_menu_exit="退出脚本"
+T_menu_install_local="安装脚本"
+T_menu_install_local_desc="安装到 /usr/local/bin/pikash 供本地调用"
+T_menu_install_local_fetching="正在下载"
+T_menu_install_local_success="安装成功"
+T_menu_install_local_failed="安装失败，请检查网络"
+T_menu_install_local_usage="使用方式"
 
 # ---- Deploy submenu ----
 T_deploy_mirror="更换镜像源"

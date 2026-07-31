@@ -150,6 +150,7 @@ MENU_MAIN=(
     "bench|menu.bench|menu.bench.desc|menu_bench"
     "proxy|menu.proxy|menu.proxy.desc|menu_proxy"
     "system|menu.system|menu.system.desc|menu_system"
+    "install_local|menu.install_local|menu.install_local.desc|menu_install_local"
 )
 
 # ---- Submenu handlers (all follow pattern: load module, render, dispatch) ----
@@ -181,6 +182,29 @@ menu_proxy() {
 menu_system() {
     _load_module "system.sh" || return
     _menu_loop "system" "SystemMENU" "menu.system"
+}
+
+menu_install_local() {
+    local dest="/usr/local/bin/pikash"
+    local url="https://pikash.opkg.cn/Menu.sh"
+    local tmp; tmp=$(mktemp 2>/dev/null || echo "/tmp/pikash-$$.sh")
+
+    pika_info "$(t 'menu.install_local.fetching') $url"
+    curl -fsSL "$url" -o "$tmp" 2>/dev/null || wget -qO "$tmp" "$url" || {
+        pika_err "$(t 'menu.install_local.failed')"
+        rm -f "$tmp"
+        return 1
+    }
+
+    cp "$tmp" "$dest" && chmod +x "$dest"
+    rm -f "$tmp"
+
+    if [ -x "$dest" ]; then
+        pika_info "$(t 'menu.install_local.success') $dest"
+        echo "  $(t 'menu.install_local.usage'): pikash"
+    else
+        pika_err "$(t 'menu.install_local.failed')"
+    fi
 }
 
 # ---- Generic menu loop ----
@@ -231,7 +255,7 @@ main() {
     # Handle direct access (positional args)
     if [ -n "$PIKA_DIRECT_CAT" ]; then
         local cat_map=(
-            "deploy" "maintain" "desktop" "bench" "proxy" "system"
+            "deploy" "maintain" "desktop" "bench" "proxy" "system" "install_local"
         )
         local cat_key="${cat_map[$((PIKA_DIRECT_CAT - 1))]}"
         if [ -n "$cat_key" ]; then
