@@ -94,7 +94,7 @@ ui_header() {
   ║    ${B}██║$C     ██║██║  ██╗${B}██║  ██║$C    ${B}███████║$C ${B}██║$C  ${B}██║$C    ║
   ║    ${B}╚═╝$C     ╚═╝╚═╝  ╚═╝${B}╚═╝  ╚═╝$C    ${B}╚══════╝$C ${B}╚═╝$C  ${B}╚═╝$C    ║
   ║                                                        ║
-  ║               ${B}皮卡Linux在线脚本 ${G}${ver}${C}                   ║
+  ║               ${B}皮卡Linux在线脚本 ${G}${ver}${C}                    ║
   ╚════════════════════════════════════════════════════════╝
 $N"
 }
@@ -107,6 +107,39 @@ ui_section() {
 # ---- Divider ----
 ui_divider() {
     printf '  %s%s%s\n' "${PIKA_CYAN}" '──────────────────────────────────────────────────────' "${PIKA_NC}"
+}
+
+# ---- System info block (compact neofetch-lite) ----
+ui_sysinfo() {
+    local os="${PIKA_DISTRO:-?} ${PIKA_DISTRO_VER:-}"
+    local kern; kern=$(uname -r 2>/dev/null || echo "?")
+    local upt; upt=$(uptime -p 2>/dev/null | sed 's/^up //' || uptime 2>/dev/null | sed 's/.*up *//;s/,[^,]*$//')
+
+    local cpu; cpu=$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ *//;s/  */ /g')
+    [ -n "$cpu" ] && cpu="${cpu} ($(nproc)C)" || cpu="?"
+    cpu="${cpu:0:35}"
+
+    local mem; mem=$(free -h 2>/dev/null | awk '/Mem:/{printf "%s / %s", $3, $2}')
+    local disk; disk=$(df -h / 2>/dev/null | awk 'NR==2{printf "%s / %s (%s)", $3, $2, $5}')
+    local ip; ip=$(ip -4 addr show scope global 2>/dev/null | grep inet | awk '{print $2}' | head -1)
+
+    local C="${PIKA_CYAN}" N="${PIKA_NC}" G="${PIKA_GREEN}" B="${PIKA_BOLD}"
+
+    printf '%b' \
+"${C}
+  ┌──────────────────────────────────────────────────────┐
+  │  ${G}操作系统${C}    ${B}${os}${C}
+  │  ${G}内核版本${C}    ${kern}
+  │  ${G}运行时间${C}    ${upt:-?}${N}
+  ${C}├──────────────────────────────────────────────────────┤
+  │  ${G}CPU 型号${C}   ${cpu}
+  │  ${G}内存用量${C}   ${mem:-?}
+  │  ${G}磁盘用量${C}   ${disk:-?}${N}
+  ${C}└──────────────────────────────────────────────────────┘
+${N}"
+    if [ -n "$ip" ]; then
+        printf '%b' "  ${G}IP${C}          ${B}${ip}${N}\n"
+    fi
 }
 
 # ============================================================
