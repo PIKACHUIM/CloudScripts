@@ -253,6 +253,7 @@ ui_menu() {
     [ -n "$back_label" ] && ui_item "0" "$back_label" ""
 
     printf '\n'
+    ui_divider
     printf '  %s ' "$(t 'menu.prompt')"
 }
 
