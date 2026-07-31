@@ -3,41 +3,24 @@
   <img src="https://img.shields.io/badge/License-GPL%20%7C%20MIT-green?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/Shell-Bash%20%7C%20PowerShell-orange?style=flat-square" alt="Shell">
   <a href="https://github.com/PIKACHUIM/CloudScripts/actions/workflows/shellcheck.yml"><img src="https://github.com/PIKACHUIM/CloudScripts/actions/workflows/shellcheck.yml/badge.svg" alt="ShellCheck"></a>
+  <a href="https://github.com/PIKACHUIM/CloudScripts/actions/workflows/pages-deploy.yml"><img src="https://github.com/PIKACHUIM/CloudScripts/actions/workflows/pages-deploy.yml/badge.svg" alt="Pages"></a>
 </p>
 
 <h1 align="center">⚡ 皮卡在线脚本托管平台</h1>
 <p align="center"><strong>Pika Online Script Hosting Platform</strong></p>
 
 <p align="center">
-  一键部署 · 性能测评 · 网络诊断 · 桌面环境 · 容器引擎 · 🇨🇳 大陆加速 · 🌐 多语言
+  一键部署 · 性能测评 · 网络诊断 · 桌面环境 · 容器引擎 · 🇨🇳 大陆加速 · 🌐 多语言 · 📖 文档站点
 </p>
 
 <p align="center">
   <a href="https://github.com/PIKACHUIM/CloudScripts"><b>📦 项目地址</b></a> &nbsp;|&nbsp;
+  <a href="https://gh-bat.pika.net.cn"><b>📖 文档站点</b></a> &nbsp;|&nbsp;
   <a href="https://github.524228.xyz/PIKACHUIM/CloudScripts"><b>🚀 国内加速</b></a>
 </p>
 
 ---
 
-### 架构
-
-```
-Menu.sh (引导器 ~230行)
-├── Lib/00-core.sh    日志/配置/系统检测
-├── Lib/10-net.sh     多级镜像探测/统一下载
-├── Lib/20-pkg.sh     6种包管理器抽象
-├── Lib/30-svc.sh     PM2/systemd/nohup 统一托管
-├── Lib/40-ui.sh      菜单渲染/CJK对齐
-├── Lib/50-i18n.sh    多语言自动切换
-├── I18n/zh_CN.sh     中文语言包 (兜底)
-├── I18n/en_US.sh     英文语言包
-├── Modules/deploy.sh     部署安装模块
-├── Modules/maintain.sh   系统维护模块
-├── Modules/desktop.sh    桌面安装模块
-├── Modules/bench.sh      性能测评模块
-├── Modules/proxy.sh      代理组网模块
-└── Modules/system.sh     系统工具模块
-```
 
 ## 🚀 快速开始
 
@@ -56,22 +39,24 @@ bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Men
 
 | 类别 | 说明 |
 |:-----|:-----|
-| 🖥️ **1. 部署安装** | 换源/面板(宝塔/1Panel/NetPanel)/探针/Docker+Podman/组网/Node+PM2 |
+| 🖥️ **1. 部署安装** | 换源/面板(宝塔/1Panel/NetPanel)/探针/Docker+Podman/EasyTier/FRPS/RustDesk/Node+PM2 |
 | 🔧 **2. 系统维护** | 清理/BBR加速/BBRPlus/Swap管理/Fail2ban/UFW防火墙/DD重装/内核管理 |
 | 🎨 **3. 桌面安装** | Debian LXC 容器桌面：Xfce4/GNOME3/Plasma/MATE/Deepin/Lingmo/Hyprland/Niri (共8种) |
 | 📊 **4. 性能测评** | 融合怪/IP质量/LemonBench/YABS/UnixBench/SuperBench/SuperSpeed/BestTrace 等 13 项 |
-| 🌐 **5. 代理组网** | 3X-UI/Clash/Hysteria2/SS-rust/Trojan-Go/WARP/WireGuard/wg-easy |
-| 🛠️ **6. 系统工具** | SSH加固/时区校时/系统信息/自更新/快捷命令/卸载回滚 |
+| 🌐 **5. 代理组网** | 3X-UI/Clash/Hysteria2/SS-rust/Trojan-Go/WARP/WireGuard/wg-easy/ZeroTier/Tailscale |
+| 🛠️ **6. 系统工具** | SSH加固/时区校时/修改主机名/系统信息/自更新/快捷命令/卸载回滚 |
 
 > 中国大陆用户可直接使用，脚本内置**多级镜像自动探测**，无需手动指定加速通道。
 
 ### 新增特性 (v1.0)
 
 - 🌐 **大陆网络加速**：多级镜像通道自动探测，抗 DNS 污染校验，24h 缓存
-- 🌍 **中英双语**：按系统语言自动切换，支持 `--lang=en_US` 手动指定
+- 🌍 **中英双语**：默认中文，支持 `--lang=en_US` 手动切换
 - 🔧 **统一服务托管**：PM2 优先 > systemd 次选 > nohup 降级，提供统一的启停/日志/卸载接口
 - 📦 **按需加载**：主入口轻量化 (~230行)，业务模块按需下载缓存
 - 🛡️ **安全加固**：随机口令、sysctl 幂等写入、危险操作二次确认
+- 📊 **系统信息卡片**：类似 neofetch 的硬件信息展示（CPU/GPU/内存/磁盘/IP）
+- 🖥️ **修改主机名**：RFC 952/1123 校验，自动更新 /etc/hosts 和 cloud-init
 - 🔄 **脚本自更新**：支持快捷命令 `p` 一键启动
 
 ### 命令行参数
@@ -109,12 +94,12 @@ bash Menu.sh [分类] [项目] [选项]
 | Podman + 镜像 | Podman + registries 镜像加速 |
 | 宝塔面板 | 自动安装并配置用户名、密码、面板端口 |
 | 1Panel | 现代化开源面板一键安装 |
-| FRP Panel | 内网穿透面板 (PM2) |
 | NetPanel | 轻量服务器管理面板 |
 | 哪吒探针 | Agent 自动注册 |
 | Node.js + PM2 | NVM + npmmirror 源 |
-| EasyTier | P2P 组网 |
-| RustDesk/ZeroTier/Tailscale | 中转与组网 |
+| EasyTier | P2P 组网工具 |
+| FRPS | FRP 内网穿透服务端 |
+| RustDesk | 远程桌面中继服务 |
 
 </details>
 
@@ -289,15 +274,20 @@ Microsoft Activation Scripts (MAS) AIO v3.10，支持 Windows 和 Office 全系�
 CloudScripts/
 ├── Menu.sh                     # ⭐ 总菜单入口（自动识别系统）
 ├── README.MD                   # 本文档
+├── .github/workflows/          # CI/CD（ShellCheck / Pages 部署）
+├── docs/                       # VitePress 文档站点
 │
 ├── Linux/
+│   ├── Lib/                    # 核心库（网络/包管理/UI/i18n/服务托管）
+│   ├── I18n/                   # 中英文语言包
+│   ├── Modules/                # 业务模块（6 大菜单）
+│   ├── Desktop/                # Debian LXC 桌面环境（8种）
+│   ├── VPSTest/                # 性能测评（13款工具）
 │   ├── VPSSets/                # VPS 服务器部署
 │   │   ├── Setup.sh            #   交互式一键部署
 │   │   └── Vault.sh            #   AES-256 凭据生成器
-│   ├── Desktop/                # Debian LXC 桌面环境（8种）
-│   ├── VPSTest/                # 性能测评（13款工具）
 │   ├── Cleaner/                # 系统清理
-│   └── Tunnels/3x-ui/          # 3X-UI 代理面板
+│   └── Tunnels/                # 代理面板/内网穿透
 │
 └── WinNT/
     ├── Docker/                  # Docker CE / Mirantis / nerdctl
@@ -311,6 +301,7 @@ CloudScripts/
 | 类型 | 地址 |
 |:-----|:-----|
 | 📦 GitHub | <https://github.com/PIKACHUIM/CloudScripts> |
+| 📖 文档站点 | <https://gh-bat.pika.net.cn> |
 | 🚀 国内加速 | <https://github.524228.xyz/PIKACHUIM/CloudScripts> |
 | 📥 直连 Raw | `https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main` |
 | ⚡ 加速 Raw | `https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main` |
