@@ -310,6 +310,7 @@ ui_confirm_install() {
 
 # ---- Print tip ----
 ui_tip() {
+    printf '  %s%s%s\n' "${PIKA_CYAN}" '──────────────────────────────────────────────────────────' "${PIKA_NC}"
     printf '  %s💡 %s%s\n' "${PIKA_MAGENTA}" "$*" "${PIKA_NC}"
 }
 
