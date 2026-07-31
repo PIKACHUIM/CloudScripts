@@ -88,6 +88,13 @@ _bootstrap() {
         . "$lib_core"
     fi
 
+    # Auto-clean stale module cache (older than 24h)
+    local cache_dir="${PIKA_CACHE_DIR}/modules"
+    if [ -d "$cache_dir" ]; then
+        find "$cache_dir" -name '*.sh' -mtime +0 -delete 2>/dev/null || \
+            find "$cache_dir" -name '*.sh' -mmin +1440 -delete 2>/dev/null || true
+    fi
+
     # Load remaining libraries
     _load_lib "50-i18n.sh"
     _load_lib "10-net.sh"
@@ -124,27 +131,27 @@ _load_module() {
         return
     fi
 
-    # Try fetching from CDN
+    # Delete stale cache — always fetch fresh
+    rm -f "${cache_dir}/${mod}"
+
+    # Try CDN
     local cached="${cache_dir}/${mod}"
-    if pika_fetch "Linux/Modules/${mod}" -o "$cached.tmp" 2>/dev/null; then
-        mv -f "$cached.tmp" "$cached"
+    local tmpf="${cached}.tmp"
+    if pika_fetch "Linux/Modules/${mod}" -o "$tmpf" 2>/dev/null; then
+        mv -f "$tmpf" "$cached"
         . "$cached"
         return
     fi
+    rm -f "$tmpf"
 
-    # Fallback: raw.githubusercontent.com (always up-to-date)
+    # Fallback: raw.githubusercontent.com
     local raw_url="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Modules/${mod}"
-    if curl -fsSL "$raw_url" -o "$cached.tmp" 2>/dev/null || wget -qO "$cached.tmp" "$raw_url" 2>/dev/null; then
-        mv -f "$cached.tmp" "$cached"
+    if curl -fsSL "$raw_url" -o "$tmpf" 2>/dev/null || wget -qO "$tmpf" "$raw_url" 2>/dev/null; then
+        mv -f "$tmpf" "$cached"
         . "$cached"
         return
     fi
-
-    # Last resort: stale local cache
-    if [ -f "$cached" ]; then
-        . "$cached"
-        return
-    fi
+    rm -f "$tmpf"
 
     pika_err "$(t 'common.error'): module $mod"
     return 1
