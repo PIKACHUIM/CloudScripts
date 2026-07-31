@@ -59,7 +59,7 @@ jobs:
           cp .pika-healthz _site/ 2>/dev/null || printf 'OK' > _site/.pika-healthz
 
           # Mirror raw scripts at site root (backward compatible CDN paths)
-          # gh-bat.pika.net.cn/Linux/Desktop/xxx.sh → works without /raw/ prefix
+          # pikash.opkg.cn/Linux/Desktop/xxx.sh → works without /raw/ prefix
           cp -r Linux/Desktop/    _site/Linux/Desktop/    2>/dev/null || true
           cp -r Linux/VPSTest/    _site/Linux/VPSTest/    2>/dev/null || true
           cp -r Linux/Lib/        _site/Linux/Lib/        2>/dev/null || true

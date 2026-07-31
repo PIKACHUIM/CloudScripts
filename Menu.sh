@@ -79,7 +79,7 @@ _bootstrap() {
     local lib_core="${PIKA_LIB_DIR}/00-core.sh"
     if [ ! -f "$lib_core" ]; then
         _tmp_core=$(mktemp)
-        curl -fsSL "https://gh-bat.pika.net.cn/Linux/Lib/00-core.sh" -o "$_tmp_core" 2>/dev/null || \
+        curl -fsSL "https://pikash.opkg.cn/Linux/Lib/00-core.sh" -o "$_tmp_core" 2>/dev/null || \
             curl -fsSL "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Lib/00-core.sh" -o "$_tmp_core" || \
             { echo "ERROR: Cannot load core library." >&2; rm -f "$_tmp_core"; exit 1; }
         . "$_tmp_core"
@@ -103,7 +103,7 @@ _load_lib() {
         . "$local_path"
     else
         local tmpf; tmpf=$(mktemp)
-        curl -fsSL "https://gh-bat.pika.net.cn/Linux/Lib/${f}" -o "$tmpf" 2>/dev/null || \
+        curl -fsSL "https://pikash.opkg.cn/Linux/Lib/${f}" -o "$tmpf" 2>/dev/null || \
             curl -fsSL "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Lib/${f}" -o "$tmpf" || \
             { pika_warn "Cannot load: $f"; rm -f "$tmpf"; return 1; }
         . "$tmpf"

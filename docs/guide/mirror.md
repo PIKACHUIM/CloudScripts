@@ -6,7 +6,7 @@ PIKA SH 使用多级下载通道回退机制，确保在中国大陆网络环境
 
 1. **用户强制指定** - 通过 `--mirror=URL` 参数或 `PIKA_MIRROR` 环境变量指定
 2. **自建加速站** - benchs.pika.net.cn (GitHub Pages，大陆可直连)
-3. **备用加速站** - gh-vps.pika.net.cn, gh-bat.pika.net.cn
+3. **备用加速站** - gh-vps.pika.net.cn, pikash.opkg.cn
 4. **公共代理** - github.524228.xyz, ghfast.top, gh-proxy.com
 5. **上游直连** - raw.githubusercontent.com (最慢)
 

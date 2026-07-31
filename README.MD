@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://github.com/PIKACHUIM/CloudScripts"><b>📦 项目地址</b></a> &nbsp;|&nbsp;
-  <a href="https://gh-bat.pika.net.cn"><b>📖 文档站点</b></a> &nbsp;|&nbsp;
+  <a href="https://pikash.opkg.cn"><b>📖 文档站点</b></a> &nbsp;|&nbsp;
   <a href="https://github.524228.xyz/PIKACHUIM/CloudScripts"><b>🚀 国内加速</b></a>
 </p>
 
@@ -27,10 +27,10 @@
 一行命令启动总菜单，自动识别系统并展示对应功能：
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
+bash <(curl -s https://pikash.opkg.cn/Menu.sh)
 ```
 
-> 🌐 **国内加速**（镜像地址，下载更快）：
+> 🌐 **GitHub 直连**（备用）：
 > ```bash
 > bash <(curl -s https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
 > ```
@@ -166,13 +166,13 @@ sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
 apt update && apt upgrade
 
 # 2. 基础环境
-curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Desktop/LXC-Debian-Server.sh | bash -e
+curl -s https://pikash.opkg.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
 
 # 3. 图形栈
-curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
+curl -s https://pikash.opkg.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
 
 # 4. 选择桌面（示例：Deepin）
-curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Desktop/LXC-Debian-Deepin.sh | bash -e
+curl -s https://pikash.opkg.cn/Linux/Desktop/LXC-Debian-Deepin.sh | bash -e
 ```
 
 </details>
@@ -301,9 +301,9 @@ CloudScripts/
 | 类型 | 地址 |
 |:-----|:-----|
 | 📦 GitHub | <https://github.com/PIKACHUIM/CloudScripts> |
-| 📖 文档站点 | <https://gh-bat.pika.net.cn> |
+| 📖 文档站点 | <https://pikash.opkg.cn> |
 | 🚀 国内加速 | <https://github.524228.xyz/PIKACHUIM/CloudScripts> |
-| 📥 直连 Raw | `https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main` |
+| 📥 直连 Raw | `https://pikash.opkg.cn` |
 | ⚡ 加速 Raw | `https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main` |
 
 > Menu.sh 启动时会自动测速，优先使用直连，超时则自动切换到加速地址。

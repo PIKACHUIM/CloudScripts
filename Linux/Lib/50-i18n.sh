@@ -61,7 +61,7 @@ _i18n_source_pack() {
         local tmpf; tmpf=$(mktemp 2>/dev/null || echo "/tmp/pika-i18n-$$")
         # Try multiple CDN sources
         for base_url in \
-            "https://gh-bat.pika.net.cn/Linux/${pack_file}" \
+            "https://pikash.opkg.cn/Linux/${pack_file}" \
             "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/${pack_file}" \
             "https://github.524228.xyz/PIKACHUIM/CloudScripts/main/Linux/${pack_file}"
         do

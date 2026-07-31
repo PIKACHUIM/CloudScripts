@@ -52,7 +52,7 @@ case "$ARCH" in
 esac
 
 # Default CDN base for fetching remote scripts
-: "${PIKA_DESKTOP_CDN:=https://gh-bat.pika.net.cn/Linux/Desktop}"
+: "${PIKA_DESKTOP_CDN:=https://pikash.opkg.cn/Linux/Desktop}"
 
 # Quick helper: fetch and run a desktop script by name
 de_run_remote() {

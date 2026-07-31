@@ -3,8 +3,8 @@
 file="/etc/lxc-de-flag"
 set -e
 if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
-    apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
-	apt -y install curl && curl https://gh-bat.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
+    apt -y install curl && curl https://pikash.opkg.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
+	apt -y install curl && curl https://pikash.opkg.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
 else
     read -r content < "$file"      # 去掉前后空白，只读第一行
     case "$content" in

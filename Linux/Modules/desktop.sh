@@ -22,7 +22,7 @@ DesktopMENU=(
     "niri|desktop.niri|desktop.niri.desc|do_desktop_niri"
 )
 
-PIKA_DESKTOP_CDN="${PIKA_MIRROR_BASE:-https://gh-bat.pika.net.cn}/Linux/Desktop"
+PIKA_DESKTOP_CDN="${PIKA_MIRROR_BASE:-https://pikash.opkg.cn}/Linux/Desktop"
 
 # ---- Generic desktop installer: fetch and run remote script ----
 _de_install() {

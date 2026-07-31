@@ -11,7 +11,7 @@ set -e
 PIKA_MIRRORS_DEFAULT=(
     "https://benchs.pika.net.cn"                # Assets mirror (Pages)
     "https://gh-vps.pika.net.cn"                # VPS scripts mirror (Pages)
-    "https://gh-bat.pika.net.cn"                # Main scripts mirror (Pages)
+    "https://pikash.opkg.cn"                # Main scripts mirror (Pages)
     "https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
     "https://ghfast.top/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
     "https://gh-proxy.com/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"

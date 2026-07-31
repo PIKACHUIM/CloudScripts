@@ -28,7 +28,7 @@ do_mirror() {
         debian|ubuntu)
             local distro_ver="$PIKA_DISTRO_VER"
             if command -v python3 >/dev/null 2>&1; then
-                curl -fsSL "https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh" | bash -e -s mirror
+                curl -fsSL "https://pikash.opkg.cn/Linux/VPSSets/Setup.sh" | bash -e -s mirror
             else
                 # Ubuntu 24.04+ uses deb822 format
                 if [ "$PIKA_DISTRO" = "ubuntu" ] && [ "${distro_ver%%.*}" -ge 24 ] 2>/dev/null; then
@@ -42,7 +42,7 @@ do_mirror() {
             pika_info "$(t 'common.done') - $(t 'deploy.mirror')"
             ;;
         centos|rhel|fedora|rocky|almalinux)
-            curl -fsSL "https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh" | bash -e -s mirror
+            curl -fsSL "https://pikash.opkg.cn/Linux/VPSSets/Setup.sh" | bash -e -s mirror
             ;;
         *)
             pika_warn "$(t 'pkg.nosupport')"
@@ -112,17 +112,17 @@ do_netpanel() {
 do_easytier() {
     ui_confirm_install "EasyTier" "$(t 'deploy.easytier.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') EasyTier..."
-    bash <(curl -fsSL https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh) 7
+    bash <(curl -fsSL https://pikash.opkg.cn/Linux/VPSSets/Setup.sh) 7
 }
 
 do_frps() {
     ui_confirm_install "FRPS" "$(t 'deploy.frps.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') FRPS..."
-    bash <(curl -fsSL https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh) 8
+    bash <(curl -fsSL https://pikash.opkg.cn/Linux/VPSSets/Setup.sh) 8
 }
 
 do_rustdesk() {
     ui_confirm_install "RustDesk" "$(t 'deploy.rustdesk.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') RustDesk relay..."
-    bash <(curl -fsSL https://gh-bat.pika.net.cn/Linux/VPSSets/Setup.sh) A
+    bash <(curl -fsSL https://pikash.opkg.cn/Linux/VPSSets/Setup.sh) A
 }
