@@ -57,47 +57,50 @@ _ui_repeat_char() {
 
 # ---- Pad/truncate a string to a target display width (CJK-aware) ----
 _ui_str_pad() {
-    local s="$1" target="$2"
-    if command -v python3 >/dev/null 2>&1 && python3 -c "" 2>/dev/null; then
+    local s="$1" target="$2" maxw="$3"   # maxw: max chars before truncating (optional)
+    local use_python=0
+    if command -v python3 >/dev/null 2>&1 && python3 -c "" 2>/dev/null; then use_python=1; fi
+
+    # Compute display width
+    local cur
+    if [ "$use_python" = "1" ]; then
+        cur=$(python3 -c "import sys,unicodedata; s=sys.argv[1]; print(sum(2 if unicodedata.east_asian_width(c) in ('W','F') else 1 for c in s))" -- "$s" 2>/dev/null)
+    else
+        local _lc="${LC_ALL-__N__}"; LC_ALL=C
+        local leads="${s//[$'\x80'-$'\xbf']/}"
+        local chars=${#leads}
+        local wides="${leads//[!$'\xe0'-$'\xf7']/}"
+        local wide=${#wides}
+        [ "$_lc" = "__N__" ] && unset LC_ALL || LC_ALL="$_lc"
+        cur=$((chars + wide))
+    fi
+
+    # If fits, just pad
+    if [ "$cur" -le "$target" ]; then
+        printf '%s%*s' "$s" $((target - cur)) ''
+        return
+    fi
+
+    # Too long — truncate safely (python3 path keeps valid UTF-8)
+    if [ "$use_python" = "1" ]; then
+        local maxc="${maxw:-$target}"
         python3 -c "
-import sys, unicodedata
-s=sys.argv[1]; target=int(sys.argv[2])
-w=0; out=[]
+import sys,unicodedata
+s=sys.argv[1]; target=int(sys.argv[2]); maxc=int(sys.argv[3])
+w=0; i=0
 for c in s:
     cw=2 if unicodedata.east_asian_width(c) in ('W','F') else 1
-    if w+cw>target:
+    if w+cw > target or i>=maxc:
         break
-    out.append(c); w+=cw
-sys.stdout.write(''.join(out) + ' '*(target-w))
-" -- "$s" "$target" 2>/dev/null && return
+    sys.stdout.write(c)
+    w+=cw; i+=1
+sys.stdout.write('...')
+" -- "$s" "$((target-3))" "$((target-3))" 2>/dev/null && return
     fi
-    # Fallback: 3-byte+ lead bytes are wide (CJK)
-    local _lc="${LC_ALL-__N__}"; LC_ALL=C
-    local leads="${s//[$'\x80'-$'\xbf']/}"
-    local chars=${#leads}
-    local wides="${leads//[!$'\xe0'-$'\xf7']/}"
-    local wide=${#wides}
-    [ "$_lc" = "__N__" ] && unset LC_ALL || LC_ALL="$_lc"
-    local cur=$((chars + wide))
-    if [ "$cur" -ge "$target" ]; then
-        # Truncate
-        local i=0 out=""
-        local _lc2="${LC_ALL-__N__}"; LC_ALL=C
-        local w2=0
-        for ((i=0; i<chars; i++)); do
-            local ch="${leads:$i:1}"
-            local cw=1
-            case "$ch" in [$'\xe0'-$'\xf7']) cw=2 ;; esac
-            [ $((w2 + cw)) -gt "$target" ] && break
-            out="${out}${ch}"
-            w2=$((w2 + cw))
-        done
-        [ "$_lc2" = "__N__" ] && unset LC_ALL || LC_ALL="$_lc2"
-        printf '%s' "$out"
-    else
-        # Pad with spaces
-        printf '%s%*s' "$s" $((target - cur)) ''
-    fi
+
+    # Fallback truncation: just take first N raw chars + "..." (avoids broken UTF-8)
+    local raw; raw="${s:0:$((target-3))}"
+    printf '%s...' "$raw"
 }
 
 # ---- Terminal width ----
@@ -215,9 +218,9 @@ ${N}"
 # ============================================================
 ui_item() {
     local num="$1" name="$2" desc="${3:-}"
-    # Column layout:  2 (indent) + 4 ([N]) + 2 (gap) + name_col (14) + 2 (gap) + desc_col (32) = 56 cols
+    # Column layout:  2 (indent) + 4 ([N]) + 2 (gap) + name_col (14) + 2 (gap) + desc_col (38) = 60 cols
     local name_col=14
-    local desc_col=32
+    local desc_col=38
     local name_padded; name_padded=$(_ui_str_pad "$name" "$name_col")
     local desc_padded; desc_padded=$(_ui_str_pad "$desc" "$desc_col")
 
