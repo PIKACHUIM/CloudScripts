@@ -48,6 +48,8 @@ SoftwareMENU=(
 # === AI 与 API ===
     "oneapi|software.oneapi|software.oneapi.desc|do_soft_oneapi"
     "newapi|software.newapi|software.newapi.desc|do_soft_newapi"
+    "cliproxyapi|software.cliproxyapi|software.cliproxyapi.desc|do_soft_cliproxyapi"
+    "sub2api|software.sub2api|software.sub2api.desc|do_soft_sub2api"
 # === 开发与自动化 ===
     "gitea|software.gitea|software.gitea.desc|do_soft_gitea"
     "n8n|software.n8n|software.n8n.desc|do_soft_n8n"
@@ -436,6 +438,30 @@ do_soft_newapi() {
         -p 3000:3000 -v /opt/newapi:/data \
         calciumion/new-api:latest 2>&1 | tail -3
     pika_info "$(t 'common.done') - http://localhost:3000"
+}
+
+do_soft_cliproxyapi() {
+    ui_confirm_install "CLIProxyAPI (CPA)" "$(t 'software.cliproxyapi.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/cpa
+    docker rm -f cpa 2>/dev/null || true
+    docker run -d --name=cpa --restart=always \
+        -p 3000:3000 -v /opt/cpa:/app/data \
+        -e CPA_ADMIN_USER=admin -e CPA_ADMIN_PASS=admin123 \
+        ghcr.io/router-for-me/cliproxyapi:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:3000 (admin/admin123)"
+}
+
+do_soft_sub2api() {
+    ui_confirm_install "Sub2API" "$(t 'software.sub2api.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/sub2api
+    docker rm -f sub2api 2>/dev/null || true
+    docker run -d --name=sub2api --restart=always \
+        -p 3000:3000 -v /opt/sub2api:/app/data \
+        -e ADMIN_USER=admin -e ADMIN_PASS=admin123 \
+        ghcr.io/wei-shaw/sub2api:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:3000 (admin/admin123)"
 }
 
 # ─── 开发与自动化 ────────────────────────────────────────────
