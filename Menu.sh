@@ -117,23 +117,23 @@ _load_module() {
     local cache_dir="${PIKA_CACHE_DIR}/modules"
     mkdir -p "$cache_dir"
 
-    # Try local first
+    # Try local file first (development mode)
     local local_mod="${PIKA_MOD_DIR}/${mod}"
     if [ -f "$local_mod" ]; then
         . "$local_mod"
         return
     fi
 
-    # Try cache
+    # Always try to fetch fresh; only use cache as offline fallback
     local cached="${cache_dir}/${mod}"
-    if [ -f "$cached" ]; then
+    if pika_fetch "Linux/Modules/${mod}" -o "$cached.tmp" 2>/dev/null; then
+        mv -f "$cached.tmp" "$cached"
         . "$cached"
         return
     fi
 
-    # Download and cache
-    pika_info "Loading module: $mod ..."
-    if pika_fetch "Linux/Modules/${mod}" -o "$cached" 2>/dev/null; then
+    # No network — use stale cache if available
+    if [ -f "$cached" ]; then
         . "$cached"
         return
     fi
