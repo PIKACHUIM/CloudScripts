@@ -1,37 +1,77 @@
-name: Pages Deploy
+name: Deploy Docs + Assets to Pages
 
 on:
   push:
-    branches: [assets]
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'Linux/**'
+      - 'WinNT/**'
+      - 'Menu.sh'
+      - 'CNAME'
+      - '.pika-healthz'
+      - '.github/workflows/pages-deploy.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
-  deploy-assets:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Checkout assets branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: assets
 
-      - name: Ensure healthz probe file exists
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Build VitePress docs
         run: |
-          if [ ! -f .pika-healthz ]; then
-            printf 'PIKA_SH_OK\nversion=1.0\nmirror=assets\n' > .pika-healthz
-          fi
-          # Also place in subdirs that might be deployed independently
-          for d in ecss-bench yabs-bench unix-bench lemonbench superbench superspeed qsyb-bench back-trace best-trace supertrace mping-test ip-quality; do
-            [ -d "$d" ] && cp .pika-healthz "$d/"
-          done
+          cd docs
+          npm ci
+          npm run docs:build
+
+      - name: Prepare deploy directory
+        run: |
+          # Start with VitePress output as base
+          cp -r docs/.vitepress/dist _site
+
+          # Custom domain
+          cp CNAME _site/
+
+          # Health check probe
+          cp .pika-healthz _site/ 2>/dev/null || printf 'OK' > _site/.pika-healthz
+
+          # Mirror raw scripts at site root (backward compatible CDN paths)
+          # gh-bat.pika.net.cn/Linux/Desktop/xxx.sh → works without /raw/ prefix
+          cp -r Linux/Desktop/    _site/Linux/Desktop/    2>/dev/null || true
+          cp -r Linux/VPSTest/    _site/Linux/VPSTest/    2>/dev/null || true
+          cp -r Linux/Lib/        _site/Linux/Lib/        2>/dev/null || true
+          cp -r Linux/Modules/    _site/Linux/Modules/    2>/dev/null || true
+          cp -r Linux/I18n/       _site/Linux/I18n/       2>/dev/null || true
+          cp    Linux/VPSSets/    _site/Linux/VPSSets/    2>/dev/null || true
+          cp    Linux/Tunnels/    _site/Linux/Tunnels/    2>/dev/null || true
+          cp Menu.sh              _site/
+          cp README.MD            _site/
+          cp CONTRIBUTING.md      _site/                  2>/dev/null || true
+          cp THIRD_PARTY_NOTICES.md _site/                2>/dev/null || true
+          cp -r WinNT/            _site/WinNT/            2>/dev/null || true
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -39,7 +79,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment

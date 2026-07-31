@@ -22,7 +22,12 @@ export default defineConfig({
             { text: "快速开始", link: "/guide/getting-started" },
             { text: "Linux 脚本", link: "/guide/linux-scripts" },
             { text: "Windows 脚本", link: "/guide/windows-scripts" },
+            { text: "镜像通道", link: "/guide/mirror" },
+            { text: "服务托管", link: "/guide/service" },
+            { text: "多语言", link: "/guide/i18n" },
             { text: "安全说明", link: "/guide/security" },
+            { text: "故障排除", link: "/guide/troubleshooting" },
+            { text: "卸载回滚", link: "/guide/uninstall" },
           ],
         },
       ],
@@ -31,7 +36,7 @@ export default defineConfig({
     socialLinks: [
       {
         icon: "github",
-        link: "https://github.com/GuEe0312/CloudScripts",
+        link: "https://github.com/PIKACHUIM/CloudScripts",
       },
     ],
 
