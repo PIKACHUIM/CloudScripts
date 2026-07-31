@@ -21,13 +21,8 @@ i18n_detect() {
     [ -n "${PIKA_LANG:-}" ] && { echo "$PIKA_LANG"; return; }
     local persisted; persisted=$(pika_config_get "lang" 2>/dev/null || true)
     [ -n "$persisted" ] && { echo "$persisted"; return; }
-    local sys_lang="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"
-    sys_lang="${sys_lang%%.*}"
-    case "${sys_lang,,}" in
-        zh_cn|zh_sg|zh_hk|zh_tw|zh) echo "zh_CN" ;;
-        en_us|en_gb|en_au|en_ca|en_nz|en_ie|en) echo "en_US" ;;
-        *) echo "zh_CN" ;;
-    esac
+    # Default to Chinese (项目主要面向中文用户); users can override via PIKA_LANG= or --lang=
+    echo "zh_CN"
 }
 
 # ============================================================

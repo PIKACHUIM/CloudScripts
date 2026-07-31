@@ -114,7 +114,8 @@ ui_divider() {
 # ============================================================
 ui_item() {
     local num="$1" name="$2" desc="${3:-}"
-    local name_col=30
+    # Column layout:  2 (indent) + 4 ([N]) + 2 (gap) + name_col + 2 (gap) = desc starts at col 10+name_col
+    local name_col=22    # display width reserved for the name column
     local name_w; name_w=$(_ui_str_width "$name")
     local pad=$((name_col - name_w))
     [ "$pad" -lt 2 ] && pad=2
