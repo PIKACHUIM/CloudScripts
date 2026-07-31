@@ -253,9 +253,6 @@ main() {
         ui_divider
         ui_section "$(t 'menu.main')"
         ui_sysinfo
-        if pika_is_container; then
-            printf '  %s%s%s\n' "${PIKA_YELLOW}" "$(t 'app.container')" "${PIKA_NC}"
-        fi
         echo ""
         ui_divider
 

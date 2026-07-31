@@ -188,23 +188,26 @@ ui_sysinfo() {
     local shell_name; shell_name=$(basename "${SHELL:-sh}" 2>/dev/null)
     local res=""; res=$(xdpyinfo 2>/dev/null | grep 'dimensions' | awk '{print $2}' | head -1)
 
-    local C="${PIKA_CYAN}" N="${PIKA_NC}" G="${PIKA_GREEN}" B="${PIKA_BOLD}"
+    local container_info=""
+    pika_is_container 2>/dev/null && container_info=" (容器环境)"
+
+    local C="${PIKA_CYAN}" N="${PIKA_NC}" G="${PIKA_GREEN}" B="${PIKA_BOLD}" Y="${PIKA_YELLOW}"
 
     printf '%b' \
 "${C}
-  ┌────────────────────────────────────────────----──────────┐
+  ┌──────────────────────────────────────────────────────┐
   │  ${G}操作系统${C}    ${B}${os}${C}
   │  ${G}内核版本${C}    ${kern} ${arch}
   │  ${G}运行时间${C}    ${upt:-?}
-  │  ${G}硬件平台${C}    ${board:0:40}${N}
-  ${C}├─────────────────────────────────────────----─────────────┤
+  │  ${G}硬件平台${C}    ${board:0:40}${Y}${container_info}${C}
+  │  ${G}网络地址${C}    ${B}${ip:-?}${N}
+  ${C}├──────────────────────────────────────────────────────┤
   │  ${G}CPU 型号${C}   ${cpu:0:40}
   │  ${G}GPU 型号${C}   ${gpu}
   │  ${G}内存用量${C}   ${mem:-?}
   │  ${G}磁盘用量${C}   ${disk:-?}${N}
-  ${C}└───────────────────────────────────────----───────────────┘
+  ${C}└──────────────────────────────────────────────────────┘
 ${N}"
-    [ -n "$ip" ] && printf '%b' "  ${G}IP${C}          ${B}${ip}${N}\n"
 }
 
 # ============================================================
