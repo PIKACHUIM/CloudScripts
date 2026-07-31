@@ -8,9 +8,13 @@ set -e
 SoftwareMENU=(
     "lucky|software.lucky|software.lucky.desc|do_soft_lucky"
     "mcsmanager|software.mcsmanager|software.mcsmanager.desc|do_soft_mcsmanager"
-    "alist|software.alist|software.alist.desc|do_soft_alist"
+    "openlist|software.openlist|software.openlist.desc|do_soft_openlist"
     "sunpanel|software.sunpanel|software.sunpanel.desc|do_soft_sunpanel"
     "uptimekuma|software.uptimekuma|software.uptimekuma.desc|do_soft_uptimekuma"
+    "dockge|software.dockge|software.dockge.desc|do_soft_dockge"
+    "npm|software.npm|software.npm.desc|do_soft_npm"
+    "gitea|software.gitea|software.gitea.desc|do_soft_gitea"
+    "navidrome|software.navidrome|software.navidrome.desc|do_soft_navidrome"
 )
 
 # ============================================================
@@ -36,15 +40,15 @@ do_soft_mcsmanager() {
 }
 
 # ============================================================
-#  Alist — 网盘聚合/文件管理
-#  https://github.com/alist-org/alist
+#  OpenList — 网盘聚合/文件管理 (AList 社区驱动分支)
+#  https://github.com/OpenListTeam/OpenList
 # ============================================================
-do_soft_alist() {
-    ui_confirm_install "Alist (网盘文件管理)" "$(t 'software.alist.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
-    pika_info "$(t 'state.installing') Alist..."
-    curl -fsSL https://alist.nn.ci/install.sh 2>/dev/null | bash -e 2>&1 | tail -5
-    local pass; pass=$(/opt/alist/alist admin random 2>/dev/null || /opt/alist/alist admin 2>/dev/null | grep password | head -1)
-    pika_info "$(t 'common.done') - Alist → http://\$(hostname -I | awk '{print \$1}'):5244"
+do_soft_openlist() {
+    ui_confirm_install "OpenList (网盘文件管理)" "$(t 'software.openlist.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') OpenList..."
+    curl -fsSL https://raw.githubusercontent.com/OpenListTeam/OpenList/main/script/install.sh 2>/dev/null | bash -e 2>&1 | tail -5
+    local pass; pass=$(/opt/openlist/openlist admin random 2>/dev/null || /opt/openlist/openlist admin 2>/dev/null | grep password | head -1)
+    pika_info "$(t 'common.done') - OpenList → http://\$(hostname -I | awk '{print \$1}'):5244"
     [ -n "$pass" ] && echo "  $pass"
 }
 
@@ -82,4 +86,73 @@ do_soft_uptimekuma() {
     pm2 start server/server.js --name uptime-kuma -- --port=3001
     pm2 save
     pika_info "$(t 'common.done') - Uptime Kuma → http://\$(hostname -I | awk '{print \$1}'):3001"
+}
+
+# ============================================================
+#  Dockge — Docker Compose 管理面板
+#  https://github.com/louislam/dockge
+# ============================================================
+do_soft_dockge() {
+    ui_confirm_install "Dockge (Docker Compose 管理)" "$(t 'software.dockge.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') Dockge..."
+    mkdir -p /opt/dockge && cd /opt/dockge
+    curl -fsSL https://raw.githubusercontent.com/louislam/dockge/master/compose.yaml -o docker-compose.yml
+    docker compose up -d 2>&1 | tail -3
+    pika_info "$(t 'common.done') - Dockge → http://\$(hostname -I | awk '{print \$1}'):5001"
+}
+
+# ============================================================
+#  Nginx Proxy Manager — 反向代理/SSL 管理面板
+#  https://github.com/NginxProxyManager/nginx-proxy-manager
+# ============================================================
+do_soft_npm() {
+    ui_confirm_install "Nginx Proxy Manager (反向代理)" "$(t 'software.npm.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') Nginx Proxy Manager..."
+    if ! command -v docker >/dev/null 2>&1; then
+        pika_info "Docker not found, installing..."
+        curl -fsSL https://get.docker.com | bash -e
+    fi
+    mkdir -p /opt/npm && cd /opt/npm
+    curl -fsSL https://raw.githubusercontent.com/NginxProxyManager/nginx-proxy-manager/develop/docker-compose.yml -o docker-compose.yml
+    docker compose up -d 2>&1 | tail -3
+    pika_info "$(t 'common.done') - NPM → http://\$(hostname -I | awk '{print \$1}'):81 (admin@example.com/changeme)"
+}
+
+# ============================================================
+#  Gitea — 轻量级自托管 Git 服务
+#  https://github.com/go-gitea/gitea
+# ============================================================
+do_soft_gitea() {
+    ui_confirm_install "Gitea (自托管 Git)" "$(t 'software.gitea.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') Gitea..."
+    if ! command -v docker >/dev/null 2>&1; then
+        pika_info "Docker not found, installing..."
+        curl -fsSL https://get.docker.com | bash -e
+    fi
+    mkdir -p /opt/gitea && cd /opt/gitea
+    docker run -d --name=gitea --restart=always -p 3000:3000 -p 2222:22 \
+        -v /opt/gitea/data:/data -v /etc/timezone:/etc/timezone:ro -v /etc/localtime:/etc/localtime:ro \
+        gitea/gitea:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - Gitea → http://\$(hostname -I | awk '{print \$1}'):3000"
+}
+
+# ============================================================
+#  Navidrome — 音乐流媒体服务器
+#  https://github.com/navidrome/navidrome
+# ============================================================
+do_soft_navidrome() {
+    ui_confirm_install "Navidrome (音乐流媒体)" "$(t 'software.navidrome.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') Navidrome..."
+    if ! command -v docker >/dev/null 2>&1; then
+        pika_info "Docker not found, installing..."
+        curl -fsSL https://get.docker.com | bash -e
+    fi
+    mkdir -p /opt/navidrome/data /opt/navidrome/music
+    docker run -d --name=navidrome --restart=always \
+        -p 4533:4533 \
+        -v /opt/navidrome/data:/data \
+        -v /opt/navidrome/music:/music:ro \
+        -e ND_LOGLEVEL=info \
+        deluan/navidrome:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - Navidrome → http://\$(hostname -I | awk '{print \$1}'):4533"
 }
