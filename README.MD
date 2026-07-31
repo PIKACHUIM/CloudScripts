@@ -43,8 +43,9 @@ bash <(curl -s https://pikash.opkg.cn/Menu.sh)
 | 🔧 **2. 系统维护** | 清理/BBR加速/BBRPlus/Swap管理/Fail2ban/UFW防火墙/DD重装/内核管理 |
 | 🎨 **3. 桌面安装** | Debian LXC 容器桌面：Xfce4/GNOME3/Plasma/MATE/Deepin/Lingmo/Hyprland/Niri (共8种) |
 | 📊 **4. 性能测评** | 融合怪/IP质量/LemonBench/YABS/UnixBench/SuperBench/SuperSpeed/BestTrace 等 13 项 |
-| 🌐 **5. 代理组网** | 3X-UI/Clash/Hysteria2/SS-rust/Trojan-Go/WARP/WireGuard/wg-easy/ZeroTier/Tailscale |
-| 🛠️ **6. 系统工具** | SSH加固/时区校时/修改主机名/系统信息/自更新/快捷命令/卸载回滚 |
+| 📥 **5. 软件安装** | Lucky(DDNS/反代)/MCSManager(游戏面板)/Alist(网盘)/Sun-Panel(导航)/Uptime Kuma(监控) |
+| 🌐 **6. 代理组网** | 3X-UI/Clash/Hysteria2/SS-rust/Trojan-Go/WARP/WireGuard/wg-easy/ZeroTier/Tailscale |
+| 🛠️ **7. 系统工具** | SSH加固/时区校时/修改主机名/系统信息/自更新/快捷命令/卸载回滚 |
 
 > 中国大陆用户可直接使用，脚本内置**多级镜像自动探测**，无需手动指定加速通道。
 

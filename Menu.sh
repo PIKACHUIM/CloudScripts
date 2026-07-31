@@ -148,6 +148,7 @@ MENU_MAIN=(
     "maintain|menu.maintain|menu.maintain.desc|menu_maintain"
     "desktop|menu.desktop|menu.desktop.desc|menu_desktop"
     "bench|menu.bench|menu.bench.desc|menu_bench"
+    "software|menu.software|menu.software.desc|menu_software"
     "proxy|menu.proxy|menu.proxy.desc|menu_proxy"
     "system|menu.system|menu.system.desc|menu_system"
     "install_local|menu.install_local|menu.install_local.desc|menu_install_local"
@@ -172,6 +173,11 @@ menu_desktop() {
 menu_bench() {
     _load_module "bench.sh" || return
     _menu_loop "bench" "BenchMENU" "menu.bench"
+}
+
+menu_software() {
+    _load_module "software.sh" || return
+    _menu_loop "software" "SoftwareMENU" "menu.software"
 }
 
 menu_proxy() {
@@ -255,7 +261,7 @@ main() {
     # Handle direct access (positional args)
     if [ -n "$PIKA_DIRECT_CAT" ]; then
         local cat_map=(
-            "deploy" "maintain" "desktop" "bench" "proxy" "system" "install_local"
+            "deploy" "maintain" "desktop" "bench" "software" "proxy" "system" "install_local"
         )
         local cat_key="${cat_map[$((PIKA_DIRECT_CAT - 1))]}"
         if [ -n "$cat_key" ]; then
