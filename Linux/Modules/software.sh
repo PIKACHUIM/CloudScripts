@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 #  PIKA SH - Software Install Module
-#  40+ popular self-hosted tools — one-click install
+#  53 popular self-hosted tools — one-click install
 # ============================================================
 set -e
 
@@ -9,12 +9,20 @@ SoftwareMENU=(
 # === 网络与服务 ===
     "lucky|software.lucky|software.lucky.desc|do_soft_lucky"
     "npm|software.npm|software.npm.desc|do_soft_npm"
+    "ddnsgo|software.ddnsgo|software.ddnsgo.desc|do_soft_ddnsgo"
+# === AI 对话前端 ===
+    "lobechat|software.lobechat|software.lobechat.desc|do_soft_lobechat"
+    "openwebui|software.openwebui|software.openwebui.desc|do_soft_openwebui"
 # === 面板与管理 ===
     "portainer|software.portainer|software.portainer.desc|do_soft_portainer"
     "dockge|software.dockge|software.dockge.desc|do_soft_dockge"
+    "glance|software.glance|software.glance.desc|do_soft_glance"
     "homarr|software.homarr|software.homarr.desc|do_soft_homarr"
     "sunpanel|software.sunpanel|software.sunpanel.desc|do_soft_sunpanel"
     "homepage|software.homepage|software.homepage.desc|do_soft_homepage"
+# === 博客与 CMS ===
+    "halo|software.halo|software.halo.desc|do_soft_halo"
+    "typecho|software.typecho|software.typecho.desc|do_soft_typecho"
 # === 影音媒体 ===
     "jellyfin|software.jellyfin|software.jellyfin.desc|do_soft_jellyfin"
     "navidrome|software.navidrome|software.navidrome.desc|do_soft_navidrome"
@@ -26,12 +34,17 @@ SoftwareMENU=(
     "transmission|software.transmission|software.transmission.desc|do_soft_transmission"
 # === 密码与安全 ===
     "vaultwarden|software.vaultwarden|software.vaultwarden.desc|do_soft_vaultwarden"
+    "casdoor|software.casdoor|software.casdoor.desc|do_soft_casdoor"
     "privatebin|software.privatebin|software.privatebin.desc|do_soft_privatebin"
     "cloudflareddns|software.cloudflareddns|software.cloudflareddns.desc|do_soft_cloudflareddns"
+# === 内网穿透与组网 ===
+    "nps|software.nps|software.nps.desc|do_soft_nps"
 # === 存储与同步 ===
     "nextcloud|software.nextcloud|software.nextcloud.desc|do_soft_nextcloud"
     "syncthing|software.syncthing|software.syncthing.desc|do_soft_syncthing"
     "filebrowser|software.filebrowser|software.filebrowser.desc|do_soft_filebrowser"
+# === 搜索引擎 ===
+    "searxng|software.searxng|software.searxng.desc|do_soft_searxng"
 # === AI 与 API ===
     "oneapi|software.oneapi|software.oneapi.desc|do_soft_oneapi"
     "newapi|software.newapi|software.newapi.desc|do_soft_newapi"
@@ -42,12 +55,23 @@ SoftwareMENU=(
     "it_tools|software.it_tools|software.it_tools.desc|do_soft_it_tools"
     "stirlingpdf|software.stirlingpdf|software.stirlingpdf.desc|do_soft_stirlingpdf"
 # === 生产力 ===
+    "siyuan|software.siyuan|software.siyuan.desc|do_soft_siyuan"
     "memos|software.memos|software.memos.desc|do_soft_memos"
     "trilium|software.trilium|software.trilium.desc|do_soft_trilium"
     "excalidraw|software.excalidraw|software.excalidraw.desc|do_soft_excalidraw"
+    "vikunja|software.vikunja|software.vikunja.desc|do_soft_vikunja"
     "homebox|software.homebox|software.homebox.desc|do_soft_homebox"
+# === 阅读与信息 ===
+    "miniflux|software.miniflux|software.miniflux.desc|do_soft_miniflux"
+    "wallabag|software.wallabag|software.wallabag.desc|do_soft_wallabag"
+    "changedetection|software.changedetection|software.changedetection.desc|do_soft_changedetection"
+# === 消息推送 ===
+    "bark|software.bark|software.bark.desc|do_soft_bark"
 # === 监控 ===
     "uptimekuma|software.uptimekuma|software.uptimekuma.desc|do_soft_uptimekuma"
+    "speedtest|software.speedtest|software.speedtest.desc|do_soft_speedtest"
+    "mcsmanager|software.mcsmanager|software.mcsmanager.desc|do_soft_mcsmanager"
+)
     "speedtest|software.speedtest|software.speedtest.desc|do_soft_speedtest"
     "mcsmanager|software.mcsmanager|software.mcsmanager.desc|do_soft_mcsmanager"
 )
@@ -84,6 +108,40 @@ do_soft_npm() {
         -v /opt/npm/data:/data -v /opt/npm/letsencrypt:/etc/letsencrypt \
         jc21/nginx-proxy-manager:latest 2>&1 | tail -3
     pika_info "$(t 'common.done') - http://localhost:81 (admin@example.com/changeme)"
+}
+
+# ─── AI 对话前端 ─────────────────────────────────────────────
+do_soft_lobechat() {
+    ui_confirm_install "LobeChat" "$(t 'software.lobechat.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    docker rm -f lobechat 2>/dev/null || true
+    docker run -d --name=lobechat --restart=always \
+        -p 3210:3210 -e OPENAI_API_KEY=sk-your-key \
+        -e OPENAI_PROXY_URL=https://api.openai.com/v1 \
+        lobehub/lobe-chat:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:3210"
+}
+
+do_soft_openwebui() {
+    ui_confirm_install "Open WebUI" "$(t 'software.openwebui.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/openwebui
+    docker rm -f open-webui 2>/dev/null || true
+    docker run -d --name=open-webui --restart=always \
+        -p 3000:8080 -v /opt/openwebui:/app/backend/data \
+        ghcr.io/open-webui/open-webui:main 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:3000"
+}
+
+do_soft_ddnsgo() {
+    ui_confirm_install "DDNS-GO" "$(t 'software.ddnsgo.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/ddns-go
+    docker rm -f ddns-go 2>/dev/null || true
+    docker run -d --name=ddns-go --restart=always \
+        -p 9876:9876 -v /opt/ddns-go:/root \
+        jeessy/ddns-go:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:9876"
 }
 
 # ─── 面板与管理 ──────────────────────────────────────────────
@@ -141,6 +199,40 @@ do_soft_homepage() {
         -v /var/run/docker.sock:/var/run/docker.sock \
         ghcr.io/gethomepage/homepage:latest 2>&1 | tail -3
     pika_info "$(t 'common.done') - http://localhost:3000"
+}
+
+do_soft_glance() {
+    ui_confirm_install "Glance" "$(t 'software.glance.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/glance
+    docker rm -f glance 2>/dev/null || true
+    docker run -d --name=glance --restart=always \
+        -p 8080:8080 -v /opt/glance/glance.yml:/app/glance.yml \
+        glanceapp/glance:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:8080"
+}
+
+# ─── 博客与 CMS ──────────────────────────────────────────────
+do_soft_halo() {
+    ui_confirm_install "Halo Blog" "$(t 'software.halo.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/halo
+    docker rm -f halo 2>/dev/null || true
+    docker run -d --name=halo --restart=always \
+        -p 8090:8090 -v /opt/halo:/root/.halo2 \
+        halohub/halo:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:8090"
+}
+
+do_soft_typecho() {
+    ui_confirm_install "Typecho" "$(t 'software.typecho.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/typecho
+    docker rm -f typecho 2>/dev/null || true
+    docker run -d --name=typecho --restart=always \
+        -p 8087:80 -v /opt/typecho:/app \
+        joyqi/typecho:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:8087"
 }
 
 # ─── 影音媒体 ────────────────────────────────────────────────
@@ -223,6 +315,13 @@ do_soft_transmission() {
 }
 
 # ─── 密码与安全 ──────────────────────────────────────────────
+do_soft_nps() {
+    ui_confirm_install "NPS (内网穿透)" "$(t 'software.nps.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') NPS..."
+    bash <(curl -fsSL https://ghproxy.net/https://raw.githubusercontent.com/ehang-io/nps/master/scripts/install.sh) 2>&1 | tail -5
+    pika_info "$(t 'common.done') - Web:8080 (admin/123)"
+}
+
 do_soft_vaultwarden() {
     ui_confirm_install "Vaultwarden" "$(t 'software.vaultwarden.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     _soft_ensure_docker
@@ -249,6 +348,24 @@ do_soft_cloudflareddns() {
     curl -fsSL https://raw.githubusercontent.com/wherelse/cloudflareddns/main/cloudflareddns.sh -o /usr/local/bin/cloudflareddns.sh
     chmod +x /usr/local/bin/cloudflareddns.sh
     pika_info "$(t 'common.done') - 编辑 /usr/local/bin/cloudflareddns.sh 填入 API Token 后通过 cron 运行"
+}
+
+do_soft_casdoor() {
+    ui_confirm_install "Casdoor" "$(t 'software.casdoor.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    docker rm -f casdoor 2>/dev/null || true
+    docker run -d --name=casdoor --restart=always \
+        -p 8000:8000 -p 7001:7001 \
+        casbin/casdoor:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:8000 (admin/123)"
+}
+
+# ─── 内网穿透与组网 ──────────────────────────────────────────
+do_soft_nps() {
+    ui_confirm_install "NPS (内网穿透)" "$(t 'software.nps.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') NPS..."
+    bash <(curl -fsSL https://ghproxy.net/https://raw.githubusercontent.com/ehang-io/nps/master/scripts/install.sh) 2>&1 | tail -5
+    pika_info "$(t 'common.done') - http://localhost:8080 (admin/123)"
 }
 
 # ─── 存储与同步 ──────────────────────────────────────────────
@@ -285,6 +402,17 @@ do_soft_filebrowser() {
     filebrowser -d /opt/filebrowser/database.db -a 0.0.0.0 -p 8082 -r / &
     sleep 2
     pika_info "$(t 'common.done') - http://localhost:8082 (admin/admin)"
+}
+
+do_soft_searxng() {
+    ui_confirm_install "SearXNG" "$(t 'software.searxng.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/searxng
+    docker rm -f searxng 2>/dev/null || true
+    docker run -d --name=searxng --restart=always \
+        -p 8888:8080 -v /opt/searxng:/etc/searxng \
+        searxng/searxng:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:8888"
 }
 
 # ─── AI 与 API ──────────────────────────────────────────────
@@ -364,6 +492,18 @@ do_soft_stirlingpdf() {
 }
 
 # ─── 生产力 ──────────────────────────────────────────────────
+do_soft_siyuan() {
+    ui_confirm_install "SiYuan 思源笔记" "$(t 'software.siyuan.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/siyuan
+    docker rm -f siyuan 2>/dev/null || true
+    docker run -d --name=siyuan --restart=always \
+        -p 6806:6806 -v /opt/siyuan:/siyuan/workspace \
+        -e SIYUAN_ACCESS_AUTH_CODE=admin \
+        b3log/siyuan:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:6806 (access code: admin)"
+}
+
 do_soft_memos() {
     ui_confirm_install "Memos" "$(t 'software.memos.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     _soft_ensure_docker
@@ -404,6 +544,64 @@ do_soft_homebox() {
         -p 7745:7745 -v /opt/homebox:/data \
         ghcr.io/sysadminsmedia/homebox:latest 2>&1 | tail -3
     pika_info "$(t 'common.done') - http://localhost:7745"
+}
+
+do_soft_vikunja() {
+    ui_confirm_install "Vikunja" "$(t 'software.vikunja.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/vikunja/files
+    docker rm -f vikunja 2>/dev/null || true
+    docker run -d --name=vikunja --restart=always \
+        -p 3456:3456 -v /opt/vikunja/files:/app/vikunja/files \
+        vikunja/vikunja:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:3456"
+}
+
+# ─── 阅读与信息 ──────────────────────────────────────────────
+do_soft_miniflux() {
+    ui_confirm_install "Miniflux" "$(t 'software.miniflux.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    docker rm -f miniflux 2>/dev/null || true
+    docker run -d --name=miniflux --restart=always \
+        -p 8088:8080 -e DATABASE_URL="postgres://miniflux:miniflux@localhost/miniflux?sslmode=disable" \
+        miniflux/miniflux:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:8088 (需配置 PostgreSQL)"
+}
+
+do_soft_wallabag() {
+    ui_confirm_install "Wallabag" "$(t 'software.wallabag.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/wallabag/data /opt/wallabag/images
+    docker rm -f wallabag 2>/dev/null || true
+    docker run -d --name=wallabag --restart=always \
+        -p 8866:80 -v /opt/wallabag/data:/var/www/wallabag/data \
+        -v /opt/wallabag/images:/var/www/wallabag/web/assets/images \
+        -e SYMFONY__ENV__DOMAIN_NAME=http://localhost:8866 \
+        wallabag/wallabag:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:8866 (wallabag/wallabag)"
+}
+
+do_soft_changedetection() {
+    ui_confirm_install "Changedetection" "$(t 'software.changedetection.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/changedetection
+    docker rm -f changedetection 2>/dev/null || true
+    docker run -d --name=changedetection --restart=always \
+        -p 5000:5000 -v /opt/changedetection:/datastore \
+        dgtlmoon/changedetection.io:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:5000"
+}
+
+# ─── 消息推送 ────────────────────────────────────────────────
+do_soft_bark() {
+    ui_confirm_install "Bark Server" "$(t 'software.bark.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    _soft_ensure_docker
+    mkdir -p /opt/bark
+    docker rm -f bark 2>/dev/null || true
+    docker run -d --name=bark --restart=always \
+        -p 8089:8080 -v /opt/bark:/data \
+        finb/bark-server:latest 2>&1 | tail -3
+    pika_info "$(t 'common.done') - http://localhost:8089 (iOS 客户端推送)"
 }
 
 # ─── 监控 ────────────────────────────────────────────────────
