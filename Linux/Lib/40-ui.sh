@@ -113,15 +113,35 @@ ui_divider() {
 ui_sysinfo() {
     local os="${PIKA_DISTRO:-?} ${PIKA_DISTRO_VER:-}"
     local kern; kern=$(uname -r 2>/dev/null || echo "?")
+    local arch; arch=$(uname -m 2>/dev/null || echo "?")
     local upt; upt=$(uptime -p 2>/dev/null | sed 's/^up //' || uptime 2>/dev/null | sed 's/.*up *//;s/,[^,]*$//')
 
     local cpu; cpu=$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ *//;s/  */ /g')
-    [ -n "$cpu" ] && cpu="${cpu} ($(nproc)C)" || cpu="?"
-    cpu="${cpu:0:35}"
+    local cores; cores=$(nproc 2>/dev/null || echo "?")
+    [ -n "$cpu" ] && cpu="${cpu} (${cores}C)" || cpu="?"
 
     local mem; mem=$(free -h 2>/dev/null | awk '/Mem:/{printf "%s / %s", $3, $2}')
     local disk; disk=$(df -h / 2>/dev/null | awk 'NR==2{printf "%s / %s (%s)", $3, $2, $5}')
     local ip; ip=$(ip -4 addr show scope global 2>/dev/null | grep inet | awk '{print $2}' | head -1)
+
+    # GPU info — lspci > /sys > glxinfo fallback
+    local gpu=""
+    if command -v lspci >/dev/null 2>&1; then
+        gpu=$(lspci 2>/dev/null | grep -iE 'vga|3d|display' | sed 's/.*: //;s/ (rev.*//' | head -1)
+    fi
+    [ -z "$gpu" ] && gpu=$(cat /sys/class/drm/card*/device/vendor_name /sys/class/drm/card*/device/product_name 2>/dev/null | paste -sd ' ' -)
+    [ -z "$gpu" ] && gpu=$(glxinfo -B 2>/dev/null | grep -i 'opengl renderer' | sed 's/.*: //')
+    [ -n "$gpu" ] && gpu="${gpu:0:45}" || gpu="?"
+
+    # Motherboard / vendor (DMI)
+    local board=""
+    board=$(cat /sys/devices/virtual/dmi/id/board_vendor /sys/devices/virtual/dmi/id/board_name 2>/dev/null | paste -sd ' ' -)
+    [ -z "$board" ] && board=$(cat /sys/devices/virtual/dmi/id/sys_vendor /sys/devices/virtual/dmi/id/product_name 2>/dev/null | paste -sd ' ' -)
+    [ -z "$board" ] && board="Virtual Machine"
+
+    # Shell + resolution
+    local shell_name; shell_name=$(basename "${SHELL:-sh}" 2>/dev/null)
+    local res=""; res=$(xdpyinfo 2>/dev/null | grep 'dimensions' | awk '{print $2}' | head -1)
 
     local C="${PIKA_CYAN}" N="${PIKA_NC}" G="${PIKA_GREEN}" B="${PIKA_BOLD}"
 
@@ -129,17 +149,17 @@ ui_sysinfo() {
 "${C}
   ┌──────────────────────────────────────────────────────┐
   │  ${G}操作系统${C}    ${B}${os}${C}
-  │  ${G}内核版本${C}    ${kern}
-  │  ${G}运行时间${C}    ${upt:-?}${N}
+  │  ${G}内核版本${C}    ${kern} ${arch}
+  │  ${G}运行时间${C}    ${upt:-?}
+  │  ${G}硬件平台${C}    ${board:0:40}${N}
   ${C}├──────────────────────────────────────────────────────┤
-  │  ${G}CPU 型号${C}   ${cpu}
+  │  ${G}CPU 型号${C}   ${cpu:0:40}
+  │  ${G}GPU 型号${C}   ${gpu}
   │  ${G}内存用量${C}   ${mem:-?}
   │  ${G}磁盘用量${C}   ${disk:-?}${N}
   ${C}└──────────────────────────────────────────────────────┘
 ${N}"
-    if [ -n "$ip" ]; then
-        printf '%b' "  ${G}IP${C}          ${B}${ip}${N}\n"
-    fi
+    [ -n "$ip" ] && printf '%b' "  ${G}IP${C}          ${B}${ip}${N}\n"
 }
 
 # ============================================================
