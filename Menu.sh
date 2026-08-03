@@ -131,22 +131,34 @@ _load_module() {
         return
     fi
 
-    # Delete stale cache — always fetch fresh
-    rm -f "${cache_dir}/${mod}"
-
-    # Try CDN
     local cached="${cache_dir}/${mod}"
     local tmpf="${cached}.tmp"
-    if pika_fetch "Linux/Modules/${mod}" -o "$tmpf" 2>/dev/null; then
+
+    # Fetch a module and verify it parses BEFORE using it. A stale/broken
+    # source (e.g. CDN not yet redeployed) is rejected and we fall back to the
+    # other source, instead of sourcing a file with a syntax error.
+    _pika_fetch_checked() {
+        local url="$1" out="$2"
+        if curl -fsSL "$url" -o "$out" 2>/dev/null || wget -qO "$out" "$url" 2>/dev/null; then
+            if bash -n "$out" 2>/dev/null; then
+                return 0
+            fi
+        fi
+        return 1
+    }
+
+    # 1) CDN mirror (China-friendly)
+    rm -f "${cache_dir}/${mod}"
+    if pika_fetch "Linux/Modules/${mod}" -o "$tmpf" 2>/dev/null && bash -n "$tmpf" 2>/dev/null; then
         mv -f "$tmpf" "$cached"
         . "$cached"
         return
     fi
     rm -f "$tmpf"
 
-    # Fallback: raw.githubusercontent.com
+    # 2) Fallback: live GitHub source (always reflects current repo HEAD)
     local raw_url="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Modules/${mod}"
-    if curl -fsSL "$raw_url" -o "$tmpf" 2>/dev/null || wget -qO "$tmpf" "$raw_url" 2>/dev/null; then
+    if _pika_fetch_checked "$raw_url" "$tmpf"; then
         mv -f "$tmpf" "$cached"
         . "$cached"
         return
@@ -207,18 +219,43 @@ menu_system() {
 
 menu_install_local() {
     local dest="/usr/local/bin/pikash"
-    local url="https://pikash.opkg.cn/Menu.sh"
-    local tmp; tmp=$(mktemp 2>/dev/null || echo "/tmp/pikash-$$.sh")
 
-    pika_info "$(t 'menu.install_local.fetching') $url"
-    curl -fsSL "$url" -o "$tmp" 2>/dev/null || wget -qO "$tmp" "$url" || {
-        pika_err "$(t 'menu.install_local.failed')"
-        rm -f "$tmp"
-        return 1
-    }
+    pika_info "$(t 'menu.install_local.fetching')"
+    # Install a thin self-updating launcher instead of a frozen copy.
+    # It always fetches the latest Menu.sh from CDN before running, so the
+    # entry script and every cached module stay fresh — no more stale cache.
+    cat > "$dest" <<'PIKA_LAUNCHER'
+#!/usr/bin/env bash
+# pikash launcher — always runs the latest Menu.sh
+set -e
+PIKA_URL="https://pikash.opkg.cn/Menu.sh"
+PIKA_RAW="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh"
+CACHE_DIR="${PIKA_CACHE_DIR:-/var/cache/pika-sh}"
+CACHED="$CACHE_DIR/Menu.sh"
+TMP="$(mktemp 2>/dev/null || echo "/tmp/pikash-$$.sh")"
+fetch_ok=0
+if curl -fsSL "$PIKA_URL" -o "$TMP" 2>/dev/null || wget -qO "$TMP" "$PIKA_URL" 2>/dev/null; then
+    if bash -n "$TMP" 2>/dev/null; then fetch_ok=1; fi
+fi
+if [ "$fetch_ok" -ne 1 ]; then
+    if curl -fsSL "$PIKA_RAW" -o "$TMP" 2>/dev/null || wget -qO "$TMP" "$PIKA_RAW" 2>/dev/null; then
+        if bash -n "$TMP" 2>/dev/null; then fetch_ok=1; fi
+    fi
+fi
+if [ "$fetch_ok" -eq 1 ]; then
+    mkdir -p "$CACHE_DIR" 2>/dev/null || true
+    cp -f "$TMP" "$CACHED" 2>/dev/null || true
+    exec bash "$TMP" "$@"
+fi
+rm -f "$TMP"
+if [ -f "$CACHED" ]; then
+    exec bash "$CACHED" "$@"
+fi
+echo "pikash: failed to fetch latest script and no offline cache available." >&2
+exit 1
+PIKA_LAUNCHER
 
-    cp "$tmp" "$dest" && chmod +x "$dest"
-    rm -f "$tmp"
+    chmod +x "$dest"
 
     if [ -x "$dest" ]; then
         pika_info "$(t 'menu.install_local.success') $dest"
