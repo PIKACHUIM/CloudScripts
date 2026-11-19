@@ -52,7 +52,7 @@ while [ $# -gt 0 ]; do
             echo ""
             echo "Direct access: bash Menu.sh 1 1    (Deploy > Mirror)"
             echo "              bash Menu.sh 3       (Desktop menu)"
-            echo "              bash Menu.sh caddy   (Caddy gateway)"
+            echo "              bash Menu.sh reverseproxy   (Caddy / Nginx gateway)"
             exit 0
             ;;
         [1-9]|[1-9][0-9])
@@ -63,7 +63,7 @@ while [ $# -gt 0 ]; do
             fi
             shift
             ;;
-        deploy|maintain|desktop|bench|software|proxy|caddy|system|install_local)
+        deploy|maintain|desktop|bench|software|proxy|reverseproxy|caddy|system|install_local)
             if [ -z "$PIKA_DIRECT_CAT" ]; then
                 PIKA_DIRECT_CAT="$1"
             fi
@@ -184,7 +184,7 @@ MENU_MAIN=(
     "bench|menu.bench|menu.bench.desc|menu_bench"
     "software|menu.software|menu.software.desc|menu_software"
     "proxy|menu.proxy|menu.proxy.desc|menu_proxy"
-    "caddy|menu.caddy|menu.caddy.desc|menu_caddy"
+    "reverseproxy|menu.reverseproxy|menu.reverseproxy.desc|menu_reverseproxy"
     "system|menu.system|menu.system.desc|menu_system"
     "install_local|menu.install_local|menu.install_local.desc|menu_install_local"
 )
@@ -220,9 +220,9 @@ menu_proxy() {
     _menu_loop "proxy" "ProxyMENU" "menu.proxy"
 }
 
-menu_caddy() {
-    _load_module "caddy.sh" || return
-    _menu_loop "caddy" "CaddyMENU" "menu.caddy"
+menu_reverseproxy() {
+    _load_module "reverseproxy.sh" || return
+    _menu_loop "reverseproxy" "ReverseProxyMENU" "menu.reverseproxy"
 }
 
 menu_system() {
@@ -326,13 +326,17 @@ main() {
     # Handle direct access (positional args)
     if [ -n "$PIKA_DIRECT_CAT" ]; then
         local cat_map=(
-            "deploy" "maintain" "desktop" "bench" "software" "proxy" "caddy" "system" "install_local"
+            "deploy" "maintain" "desktop" "bench" "software" "proxy" "reverseproxy" "system" "install_local"
         )
         local cat_key=""
         case "$PIKA_DIRECT_CAT" in
             [0-9]|[0-9][0-9]) cat_key="${cat_map[$((PIKA_DIRECT_CAT - 1))]}" ;;
             *)                 cat_key="$PIKA_DIRECT_CAT" ;;
         esac
+        # Backwards compatible alias from the previous Caddy-only menu
+        if [ "$cat_key" = "caddy" ]; then
+            cat_key="reverseproxy"
+        fi
         if [ -n "$cat_key" ] && declare -F "menu_${cat_key}" >/dev/null 2>&1; then
             if [ -n "$PIKA_DIRECT_ITEM" ]; then
                 # Direct to specific item

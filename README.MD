@@ -45,7 +45,7 @@ bash <(curl -s https://pikash.opkg.cn/Menu.sh)
 | 📊 **4. 性能测评** | 融合怪/IP质量/LemonBench/YABS/UnixBench/SuperBench/SuperSpeed/BestTrace 等 13 项 |
 | 📥 **5. 软件安装** | Lucky/LobeChat/Halo/SiYuan/DDNS-GO/NPS/Bark 等 53 款热门自托管工具 |
 | 🌐 **6. 代理组网** | 3X-UI/Clash/Hysteria2/SS-rust/Trojan-Go/WARP/WireGuard/wg-easy/ZeroTier/Tailscale |
-| 🛡️ **7. Caddy 网关** | 一键安装 Caddy / 反向代理增删改查 / 手动或 ACME 证书管理 |
+| 🛡️ **7. 反向代理** | Caddy / Nginx 二选一：一键安装、站点增删、手动或 ACME 证书 |
 | 🛠️ **8. 系统工具** | SSH加固/时区校时/修改主机名/系统信息/自更新/快捷命令/卸载回滚 |
 
 > 中国大陆用户可直接使用，脚本内置**多级镜像自动探测**，无需手动指定加速通道。
@@ -143,20 +143,20 @@ bash Menu.sh [分类] [项目] [选项]
 
 ---
 
-### 🛡️ Caddy 网关
+### 🛡️ 反向代理（Caddy / Nginx）
 
-`bash Menu.sh caddy` 可直接进入 Caddy 管理菜单（也可从主菜单选择「7. Caddy 网关」）。
+`bash Menu.sh reverseproxy` 可直接进入（也可从主菜单选择「7. 反向代理」）。两个后端都会占用 80/443，因此**同时只能运行一个**：进入另一个后端时会提示停止并停用当前后端。
 
-| 功能 | 说明 |
-|:-----|:-----|
-| 一键安装/升级 | 自动识别 CPU 架构，从官方 Release 下载二进制（支持镜像加速），注册为托管服务并开机自启 |
-| 反向代理管理 | 交互式列出/新增/删除站点，支持多域名、多上游、附加 Caddyfile 指令 |
-| 证书绑定 | 自动 ACME（需 80/443）、手动指定证书、Caddy 内部自签名、纯 HTTP 四种模式 |
-| 证书上传 | 校验证书与私钥是否匹配、解析 SAN 域名，并可直接绑定到站点 |
-| ACME 申请 | 基于 acme.sh 交互签发，支持 HTTP-01 独立/Webroot、TLS-ALPN-01、DNS 手动 TXT（无需 80 端口） |
-| 服务与配置 | 状态统计、启动/停止/重启/热重载、日志查看、Caddyfile 校验 |
+| 功能 | Caddy | Nginx |
+|:-----|:------|:------|
+| 一键安装/升级 | 官方 Release 二进制，自动识别架构，走镜像加速 | 发行版软件包安装，自动接管 conf.d |
+| 反向代理管理 | 站点片段 + `import`，多域名/多上游/附加指令 | 统一生成 `pika.conf` server 块，多域名/多上游/附加 location 指令 |
+| 证书模式 | 自动 ACME / 手动证书 / 自签名 / 纯 HTTP | acme.sh 自动签发（Webroot）/ 手动证书 / 自签名 / 纯 HTTP |
+| 证书上传 | 公私钥配对校验、SAN 解析、一键绑定 | 同左 |
+| ACME 申请 | HTTP-01 独立/Webroot、TLS-ALPN-01、DNS 手动 TXT | 同左（Webroot 可在 Nginx 运行时签发） |
+| 服务与配置 | 启停/重启/热重载/日志/`caddy validate` | 启停/重启/热重载/日志/`nginx -t` |
 
-> 站点配置以片段形式保存在 `/etc/caddy/pika/sites/*.caddy`，证书位于 `/etc/caddy/pika/certs/`，每次变更前自动备份。自动 HTTPS 需 80/443 公网可达；端口受限时请用 DNS 手动模式申请证书后绑定。
+> Caddy 配置位于 `/etc/caddy/pika/`；Nginx 站点元数据位于 `/etc/pika-sh/nginx/meta/`，生成文件为 `/etc/nginx/conf.d/pika.conf`。所有变更前自动备份，校验失败自动回滚。
 
 ---
 

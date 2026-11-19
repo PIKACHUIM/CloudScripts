@@ -165,43 +165,41 @@ docker compose up -d
 
 ---
 
-## Caddy 反向代理与证书
+## 反向代理（Caddy / Nginx）
 
-主菜单「7. Caddy 网关」提供 Caddy 的命令行交互管理，也可直接进入：
+主菜单「7. 反向代理」提供 Caddy / Nginx 二选一管理，也可直接进入：
 
 ```bash
-bash Menu.sh caddy
+bash Menu.sh reverseproxy
 ```
 
-### 安装与升级
+两个后端都会监听 80/443，**同一时间只能运行一个**。进入未被启用的后端时，会提示停止并停用另一个后端（配置与证书保留，可随时切回）。
 
-自动识别 `amd64 / arm64 / armv7 / 386` 架构，从官方 Release 下载（走镜像加速），注册为托管服务（PM2 > systemd > nohup 自适应），支持开机自启与一键升级。
+### Caddy 管理
 
-### 反向代理管理
+安装与升级：自动识别 `amd64 / arm64 / armv7 / 386` 架构，从官方 Release 下载（走镜像加速），注册为托管服务（PM2 > systemd > nohup 自适应），支持开机自启与一键升级。
+
+站点与证书：
 
 - 站点以片段形式保存在 `/etc/caddy/pika/sites/*.caddy`，主 Caddyfile 仅保留全局配置与 `import`
 - 新增站点：域名（多个用逗号分隔）、上游（支持多个做负载均衡）、证书模式、附加 Caddyfile 指令
-- 证书模式：
+- 证书模式：自动 HTTPS（需 80/443 公网可达）、手动证书、`tls internal` 自签名、纯 HTTP
+- 证书管理：上传（配对校验 + SAN 解析）、acme.sh 交互申请、列表与删除
+- 每次变更前备份到 `/etc/caddy/pika/backups/`，`caddy validate` 失败自动回滚
 
-| 模式 | 说明 |
-|------|------|
-| 自动 HTTPS | Caddy 内置 ACME，需 80/443 公网可达 |
-| 手动证书 | 选择已上传或已签发的证书 |
-| 自签名 | `tls internal`，适合内网环境 |
-| 纯 HTTP | 站点地址自动加 `http://` 前缀，不启用 TLS |
+### Nginx 管理
 
-- 每次变更前自动备份到 `/etc/caddy/pika/backups/`；校验失败会自动回滚，不会破坏正在运行的配置
+安装：使用发行版软件包（Debian/Ubuntu/RHEL/Alpine 等），自动确保 `nginx.conf` 引入 `/etc/nginx/conf.d/*.conf`；非 systemd 环境通过托管服务以 `daemon off` 方式运行。
 
-### 证书管理
+站点与证书：
 
-| 方式 | 说明 |
-|------|------|
-| 手动上传 | 校验证书与私钥是否配对、解析 SAN 域名，可一键绑定到站点 |
-| ACME 申请 | 基于 acme.sh 交互签发：HTTP-01 独立/Webroot、TLS-ALPN-01、DNS 手动 TXT |
+- 所有站点统一生成到 `/etc/nginx/conf.d/pika.conf`，元数据保存在 `/etc/pika-sh/nginx/meta/`
+- 生成内容包含 `upstream` 负载均衡、WebSocket 头、ACME Webroot 目录与 HTTP→HTTPS 跳转
+- 证书模式：自动 HTTPS（acme.sh HTTP-01 Webroot，需 80 端口）、手动证书、openssl 自签名、纯 HTTP
+- 证书管理：上传（配对校验 + SAN 解析）、acme.sh 交互申请（独立/Webroot/TLS-ALPN/DNS 手动）、删除
+- 每次变更前备份到 `/etc/pika-sh/nginx/backups/`，`nginx -t` 失败自动回滚
 
-> DNS 手动模式无需 80 端口，适合端口受限的机器；但无法自动续期，需在到期前重新执行申请流程。
-
-证书统一存放在 `/etc/caddy/pika/certs/<id>/`，Caddy 自身签发的证书会以只读形式一并列出。删除证书前会检查是否有站点正在引用。
+> DNS 手动模式无需 80 端口，适合端口受限的机器；但无法自动续期，需在到期前重新申请。Caddy 自动证书存放在 `/etc/caddy/pika/certs/`，Nginx 证书存放在 `/etc/pika-sh/nginx/certs/`；删除前会检查是否被站点引用。
 
 ---
 
