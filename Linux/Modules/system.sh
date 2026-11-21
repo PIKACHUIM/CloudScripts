@@ -10,6 +10,7 @@ SystemMENU=(
     "timezone|system.timezone|system.timezone.desc|do_sys_timezone"
     "hostname|system.hostname|system.hostname.desc|do_sys_hostname"
     "info|system.info|system.info.desc|do_sys_info"
+    "accel|system.accel|system.accel.desc|do_sys_accel"
     "update|system.update|system.update.desc|do_sys_update"
     "shortcut|system.shortcut|system.shortcut.desc|do_sys_shortcut"
     "uninstall|system.uninstall|system.uninstall.desc|do_sys_uninstall"
@@ -137,22 +138,107 @@ do_sys_info() {
 
 do_sys_update() {
     pika_info "Checking for updates..."
-    local update_url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh")
     local tmpf; tmpf=$(mktemp)
-    if curl -fsSL "$update_url" -o "$tmpf" 2>/dev/null; then
+    if pika_fetch "Menu.sh" -o "$tmpf" --no-cache; then
         local new_ver; new_ver=$(grep -m1 'PIKA_VERSION=' "$tmpf" | cut -d'"' -f2)
         local cur_ver="${PIKA_VERSION:-0.0}"
         if [ "$new_ver" != "$cur_ver" ]; then
             pika_info "New version available: v$new_ver (current: v$cur_ver)"
             if pika_confirm "Update now?"; then
-                curl -fsSL "$update_url" -o /usr/local/bin/pika-menu && chmod +x /usr/local/bin/pika-menu
-                pika_info "Updated to v$new_ver! Run: bash /usr/local/bin/pika-menu"
+                if pika_fetch "Menu.sh" -o /usr/local/bin/pika-menu --no-cache; then
+                    chmod +x /usr/local/bin/pika-menu
+                    pika_info "Updated to v$new_ver! Run: bash /usr/local/bin/pika-menu"
+                else
+                    pika_err "$(t 'common.error')"
+                fi
             fi
         else
             pika_info "Already up to date (v$cur_ver)"
         fi
+    else
+        pika_err "$(t 'common.error'): Menu.sh"
     fi
     rm -f "$tmpf"
+}
+
+# ---- Mainland acceleration console ----
+do_sys_accel() {
+    local sel cur mode
+    while true; do
+        mode=$(pika_config_get "accel" 2>/dev/null || true)
+        cur=""
+        if [ -f "$PIKA_GH_CACHE" ]; then
+            cur=$(sed -n '1p' "$PIKA_GH_CACHE" 2>/dev/null || true)
+        fi
+
+        echo ""
+        echo "  ============ $(t 'accel.title') ============"
+        if [ "$mode" = "off" ]; then
+            echo "  $(t 'accel.status'): $(t 'accel.status.off')"
+        else
+            echo "  $(t 'accel.status'): $(t 'accel.status.auto')"
+        fi
+        echo "  $(t 'accel.gh'): ${cur:-$(t 'accel.gh.none')}"
+        echo "  -------------------------------------------"
+        echo "  1) $(t 'accel.probe')"
+        echo "  2) $(t 'accel.pkg')"
+        echo "     $(t 'accel.pkg.desc')"
+        echo "  3) $(t 'accel.docker')"
+        echo "  4) $(t 'accel.npm')"
+        if [ "$mode" = "off" ]; then
+            echo "  5) $(t 'accel.toggle.off')"
+        else
+            echo "  5) $(t 'accel.toggle.on')"
+        fi
+        echo "  0) $(t 'menu.back')"
+        echo ""
+        read -r -p "  $(t 'accel.prompt'): " sel
+
+        case "$sel" in
+            0|b|B|q|Q) return ;;
+            1)
+                pika_info "$(t 'accel.probing')"
+                local p
+                p=$(pika_gh_refresh 2>/dev/null || true)
+                if [ -n "$p" ]; then
+                    pika_info "$(t 'accel.found'): $p"
+                else
+                    pika_warn "$(t 'accel.none')"
+                fi
+                ;;
+            2)
+                if pika_pkg_mirror_cn; then
+                    pika_info "$(t 'accel.done')"
+                else
+                    pika_err "$(t 'accel.failed')"
+                fi
+                ;;
+            3)
+                if pika_install_docker; then
+                    pika_docker_mirror_setup || pika_warn "$(t 'accel.failed')"
+                    pika_info "$(t 'accel.done')"
+                else
+                    pika_err "$(t 'accel.failed')"
+                fi
+                ;;
+            4)
+                pika_npm_pip_mirror_set
+                ;;
+            5)
+                if [ "$mode" = "off" ]; then
+                    pika_config_set "accel" "auto"
+                    pika_info "$(t 'accel.status.auto')"
+                else
+                    pika_config_set "accel" "off"
+                    pika_info "$(t 'accel.status.off')"
+                fi
+                ;;
+            *) pika_warn "$(t 'ui.invalid'): $sel" ;;
+        esac
+        echo ""
+        printf "  $(t 'ui.press_enter') "
+        read -r
+    done
 }
 
 do_sys_shortcut() {
@@ -160,8 +246,33 @@ do_sys_shortcut() {
     local install_path="/usr/local/bin/p"
     cat > "$install_path" << 'SCRIPT'
 #!/usr/bin/env bash
-# PIKA SH shortcut - run without arguments for interactive menu
-exec bash <(curl -sL https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh) "$@"
+# PIKA SH shortcut - always runs the latest Menu.sh (dual site + GitHub mirrors)
+set -e
+CACHE_DIR="${PIKA_CACHE_DIR:-/var/cache/pika-sh}"
+TMP="$(mktemp 2>/dev/null || echo "/tmp/pikash-$$.sh")"
+RAW="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh"
+ok=0
+for url in \
+    "https://pikash.pika.net.cn/Menu.sh" \
+    "https://pikash.opkg.cn/Menu.sh" \
+    "$RAW" \
+    "https://ghfast.top/$RAW" \
+    "https://gh-proxy.com/$RAW"; do
+    if curl -fsSL --connect-timeout 3 --max-time 25 "$url" -o "$TMP" 2>/dev/null; then
+        if bash -n "$TMP" 2>/dev/null; then ok=1; break; fi
+    fi
+done
+if [ "$ok" -eq 1 ]; then
+    mkdir -p "$CACHE_DIR" 2>/dev/null || true
+    cp -f "$TMP" "$CACHE_DIR/Menu.sh" 2>/dev/null || true
+    exec bash "$TMP" "$@"
+fi
+rm -f "$TMP"
+if [ -f "$CACHE_DIR/Menu.sh" ]; then
+    exec bash "$CACHE_DIR/Menu.sh" "$@"
+fi
+echo "pikash: failed to fetch latest script and no offline cache available." >&2
+exit 1
 SCRIPT
     chmod +x "$install_path"
     pika_info "$(t 'common.done') - Run 'p' to start PIKA SH"

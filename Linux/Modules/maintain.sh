@@ -55,9 +55,7 @@ do_bbr() {
 
 do_bbrplus() {
     ui_confirm_install "BBRPlus" "$(t 'maintain.bbrplus.desc')" || return
-    local url=$(gh_url "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh")
-    curl -fsSL "$url" -o /tmp/tcp.sh && chmod +x /tmp/tcp.sh && bash /tmp/tcp.sh
-    rm -f /tmp/tcp.sh
+    pika_run_remote --errexit "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"
 }
 
 do_kernel() {
@@ -80,29 +78,29 @@ do_kernel() {
 
             local xanmod_url="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSTest/xanmod-install.sh"
             case "$cpu_level" in
-                v1) pika_warn "$(t 'kernel.xanmod.unsupported'): v4/v3"; xanmod_url=$(gh_url "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh") ;;
+                v1) pika_warn "$(t 'kernel.xanmod.unsupported'): v4/v3"; xanmod_url="https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh" ;;
             esac
 
-            if command -v curl >/dev/null 2>&1; then
-                curl -fsSL "$xanmod_url" | bash -e || {
-                    pika_warn "XanMod install via script failed. Trying manual..."
-                    # Manual install for Debian/Ubuntu
-                    echo "deb http://deb.xanmod.org releases main" > /etc/apt/sources.list.d/xanmod.list
-                    local xanmod_gpg_url=$(gh_url "https://dl.xanmod.org/gpg.key")
-                    curl -fsSL "$xanmod_gpg_url" | gpg --dearmor -o /etc/apt/trusted.gpg.d/xanmod.gpg
-                    pkg_update_once
-                    local xanmod_pkg="linux-xanmod-x64v${cpu_level#v}"
-                    pkg_install "$xanmod_pkg" || pika_err "XanMod install failed"
-                }
+            if ! pika_run_remote --errexit "$xanmod_url"; then
+                pika_warn "XanMod install via script failed. Trying manual..."
+                # Manual install for Debian/Ubuntu
+                echo "deb http://deb.xanmod.org releases main" > /etc/apt/sources.list.d/xanmod.list
+                if pika_fetch "https://dl.xanmod.org/gpg.key" -o /tmp/pika-xanmod.gpg --max-time 30; then
+                    gpg --dearmor -o /etc/apt/trusted.gpg.d/xanmod.gpg < /tmp/pika-xanmod.gpg 2>/dev/null || true
+                    rm -f /tmp/pika-xanmod.gpg
+                fi
+                pkg_update_once || pika_warn "包索引更新失败"
+                local xanmod_pkg="linux-xanmod-x64v${cpu_level#v}"
+                pkg_install "$xanmod_pkg" || pika_err "XanMod install failed"
             fi
             ;;
         2)
-            if command -v curl >/dev/null 2>&1; then
-                curl -fsSL "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSTest/liquorix-install.sh" | bash -e || true
-            fi
+            pika_run_remote --errexit "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSTest/liquorix-install.sh" || true
             pkg_install linux-image-liquorix-amd64 linux-headers-liquorix-amd64 2>/dev/null || true
             ;;
-        3) pkg_install -t bookworm-backports linux-image-amd64 linux-headers-amd64 2>/dev/null || true ;;
+        3) if [ "$PIKA_PKG_MGR" = "apt" ]; then
+               apt-get install -y -t bookworm-backports linux-image-amd64 linux-headers-amd64 2>/dev/null || true
+           fi ;;
         4) pkg_install linux-generic-hwe-22.04 2>/dev/null || pkg_install linux-image-generic-hwe-22.04 2>/dev/null || true ;;
         *) pika_warn "$(t 'ui.invalid')" ;;
     esac
@@ -127,8 +125,7 @@ do_fail2ban() {
 
 do_blockarea() {
     ensure_cmd curl
-    local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSSets/Setup.sh")
-    curl -fsSL "$url" | bash -e -s blockarea
+    pika_run_remote --errexit "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSSets/Setup.sh" blockarea
 }
 
 do_limitport() {
@@ -145,6 +142,5 @@ do_dd() {
         return
     fi
     pika_confirm "$(t 'ui.confirm') DD reinstall - ALL DATA WILL BE LOST!" || { pika_info "$(t 'ui.cancelled')"; return; }
-    local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSSets/Setup.sh")
-    curl -fsSL "$url" | bash -e -s dd
+    pika_run_remote --errexit "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/VPSSets/Setup.sh" dd
 }

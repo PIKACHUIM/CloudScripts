@@ -34,6 +34,36 @@
 3. 使用 VPN/代理临时解决
 4. 强制指定可用通道：`bash Menu.sh --mirror=https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main`
 
+## 安装组件时 GitHub 下载失败
+
+**症状**：安装 Lucky、OpenList、Aria2、1Panel、宝塔、3x-ui 等组件时提示下载失败，或卡在 `github.com`
+
+**解决**：
+1. 当前版本会在直连失败后自动依次尝试 `ghfast.top`、`gh-proxy.com`、`ghproxy.net`、`github.524228.xyz`，通常无需处理；先确认脚本是最新版。
+2. 强制重新探测加速通道：
+   ```bash
+   rm -f /var/cache/pika-sh/gh-proxy.conf
+   bash Menu.sh
+   # 主菜单 → 8. 系统工具 → 5. 国内网络加速 → 1. 重新探测
+   ```
+3. 自定义加速前缀（写入 `/etc/pika-sh/config`）：
+   ```bash
+   echo 'gh_proxy=https://你的加速前缀/' >> /etc/pika-sh/config
+   ```
+4. 若身处海外、直连更快，可关闭加速：`bash Menu.sh --no-accel`，或在加速菜单里选择「关闭加速」。
+
+## Docker 拉取镜像超时
+
+**症状**：`docker pull ghcr.io/...` 卡住或超时
+
+**解决**：
+1. 打开 主菜单 → 8. 系统工具 → 5. 国内网络加速 → 3. 配置 Docker 镜像加速（写入 `/etc/docker/daemon.json` 的 `registry-mirrors`）。
+2. 从本工具安装的组件会自动对 `ghcr.io` / `quay.io` / `gcr.io` 走 daocloud 镜像并重新打 tag；手动拉取时可自行替换：
+   ```bash
+   docker pull ghcr.m.daocloud.io/wg-easy/wg-easy
+   docker tag  ghcr.m.daocloud.io/wg-easy/wg-easy ghcr.io/wg-easy/wg-easy
+   ```
+
 ## 依赖安装失败
 
 **症状**：apt/yum install 报错
@@ -42,7 +72,8 @@
 1. 手动更新包索引：`sudo apt update` 或 `sudo dnf makecache`
 2. 检查磁盘空间：`df -h`
 3. 确认发行版支持：Debian 9+/Ubuntu 18.04+/CentOS 7+/AlmaLinux/Rocky/Fedora/Alpine/Arch
-4. 查看详细错误日志
+4. 国内机器可在 8. 系统工具 → 5. 国内网络加速 → 2. 切换软件源（清华 TUNA，原文件自动备份）
+5. 查看详细错误日志
 
 ## 桌面安装重复/失败
 

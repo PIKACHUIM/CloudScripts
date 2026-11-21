@@ -20,7 +20,7 @@ if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ] || { [ "${BASH_VERSINFO[0]:-0}" -eq 4 ] &&
     exit 1
 fi
 
-PIKA_VERSION="1.0"
+PIKA_VERSION="1.1"
 PIKA_BASE="$(cd "$(dirname "$0")" && pwd)"
 PIKA_LIB_DIR="${PIKA_BASE}/Linux/Lib"
 PIKA_MOD_DIR="${PIKA_BASE}/Linux/Modules"
@@ -30,6 +30,7 @@ PIKA_YES=0
 PIKA_LANG=""
 PIKA_MIRROR=""
 PIKA_SVC_BACKEND_MODE=""
+PIKA_NO_ACCEL=0
 PIKA_DIRECT_CAT=""
 PIKA_DIRECT_ITEM=""
 
@@ -38,6 +39,8 @@ while [ $# -gt 0 ]; do
         --lang=*)    PIKA_LANG="${1#*=}"; shift ;;
         --mirror=*)  PIKA_MIRROR="${1#*=}"; shift ;;
         --backend=*) PIKA_SVC_BACKEND_MODE="${1#*=}"; shift ;;
+        --no-accel)  PIKA_NO_ACCEL=1; shift ;;
+        --accel)     PIKA_NO_ACCEL=0; shift ;;
         --yes|-y)    PIKA_YES=1; shift ;;
         --help|-h)
             echo "PIKA SH v${PIKA_VERSION}"
@@ -47,6 +50,7 @@ while [ $# -gt 0 ]; do
             echo "  --lang=zh_CN|en_US     Set language"
             echo "  --mirror=URL           Force mirror channel"
             echo "  --backend=pm2|systemd  Force service backend"
+            echo "  --no-accel             Disable GitHub acceleration (direct only)"
             echo "  --yes, -y              Skip all confirmations"
             echo "  --help, -h             Show this help"
             echo ""
@@ -74,7 +78,7 @@ while [ $# -gt 0 ]; do
 done
 
 # Export for sub-shells
-export PIKA_YES PIKA_LANG PIKA_MIRROR PIKA_SVC_BACKEND_MODE
+export PIKA_YES PIKA_LANG PIKA_MIRROR PIKA_SVC_BACKEND_MODE PIKA_NO_ACCEL
 
 # ---- Site endpoints (mainland edge first, then overseas) ----
 # Two independent deployments serve the same tree:
@@ -88,6 +92,13 @@ PIKA_SITE_RAW="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
 PIKA_SITE_BASE=""
 : "${PIKA_CACHE_DIR:=/var/cache/pika-sh}"
 
+# Last-resort GitHub accelerators, used only when both PIKA SH sites and the
+# raw GitHub endpoint are unreachable (common on mainland VPS).
+PIKA_GH_FALLBACK_PREFIXES=(
+    "https://ghfast.top/"
+    "https://gh-proxy.com/"
+)
+
 # Download one URL with hard timeouts (curl preferred, wget fallback).
 _pika_bootstrap_get() {
     local url="$1" out="$2" max_time="${3:-15}"
@@ -98,6 +109,18 @@ _pika_bootstrap_get() {
     if command -v wget >/dev/null 2>&1; then
         wget -q -T "$max_time" -t 1 -O "$out" "$url" 2>/dev/null && return 0
     fi
+    return 1
+}
+
+# Last resort: our raw GitHub tree through an accelerator prefix.
+_pika_bootstrap_get_accel() {
+    local path="$1" out="$2" prefix
+    [ "${PIKA_NO_ACCEL:-0}" = "1" ] && return 1
+    for prefix in "${PIKA_GH_FALLBACK_PREFIXES[@]}"; do
+        if _pika_bootstrap_get "${prefix}${PIKA_SITE_RAW}/${path}" "$out"; then
+            return 0
+        fi
+    done
     return 1
 }
 
@@ -212,6 +235,8 @@ _bootstrap() {
         elif [ "$PIKA_SITE_BASE" != "$PIKA_SITE_RAW" ] && \
              _pika_bootstrap_get "${PIKA_SITE_RAW}/Linux/Lib/00-core.sh" "$tmp_core"; then
             loaded_core=1
+        elif _pika_bootstrap_get_accel "Linux/Lib/00-core.sh" "$tmp_core"; then
+            loaded_core=1
         fi
         if [ "$loaded_core" -ne 1 ]; then
             echo "ERROR: 无法连接任何下载线路 / no reachable mirror." >&2
@@ -259,6 +284,8 @@ _load_lib() {
         ok=1
     elif [ "$PIKA_SITE_BASE" != "$PIKA_SITE_RAW" ] && \
          _pika_bootstrap_get "${PIKA_SITE_RAW}/Linux/Lib/${f}" "$tmpf" 10; then
+        ok=1
+    elif _pika_bootstrap_get_accel "Linux/Lib/${f}" "$tmpf"; then
         ok=1
     fi
     if [ "$ok" -ne 1 ]; then
@@ -334,6 +361,19 @@ _load_module() {
         return
     fi
     rm -f "$tmpf"
+
+    # 4) GitHub blocked: fetch through an accelerator prefix
+    local gh_prefix
+    if [ "${PIKA_NO_ACCEL:-0}" != "1" ]; then
+        for gh_prefix in "${PIKA_GH_FALLBACK_PREFIXES[@]}"; do
+            if _pika_fetch_checked "${gh_prefix}${PIKA_SITE_RAW}/Linux/Modules/${mod}" "$tmpf"; then
+                mv -f "$tmpf" "$cached"
+                . "$cached"
+                return
+            fi
+            rm -f "$tmpf"
+        done
+    fi
 
     pika_err "$(t 'common.error'): module $mod"
     return 1
@@ -421,6 +461,14 @@ if [ "$fetch_ok" -ne 1 ]; then
        wget -q -T 25 -t 1 -O "$TMP" "$PIKA_RAW" 2>/dev/null; then
         if bash -n "$TMP" 2>/dev/null; then fetch_ok=1; fi
     fi
+fi
+# GitHub blocked: try accelerator prefixes
+if [ "$fetch_ok" -ne 1 ] && [ "${PIKA_NO_ACCEL:-0}" != "1" ]; then
+    for _prefix in "https://ghfast.top/" "https://gh-proxy.com/"; do
+        if curl -fsSL --connect-timeout 3 --max-time 25 "${_prefix}${PIKA_RAW}" -o "$TMP" 2>/dev/null; then
+            if bash -n "$TMP" 2>/dev/null; then fetch_ok=1; break; fi
+        fi
+    done
 fi
 if [ "$fetch_ok" -eq 1 ]; then
     mkdir -p "$CACHE_DIR" 2>/dev/null || true

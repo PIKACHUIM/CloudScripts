@@ -275,8 +275,14 @@ ui_dispatch() {
         if [ "$idx" = "$sel" ]; then
             IFS='|' read -r key title_key desc_key handler <<< "$entry"
             if [ -n "$handler" ] && declare -F "$handler" >/dev/null 2>&1; then
-                "$handler" "$key"
-                return $?
+                # Run in a tested context so a failing install (set -e inside
+                # the module) returns to the menu instead of killing the shell.
+                # A handler failure is not an invalid selection: the handler
+                # already reported it, so only "back" (2) is propagated.
+                local rc=0
+                "$handler" "$key" || rc=$?
+                [ "$rc" -eq 2 ] && return 2
+                return 0
             fi
             pika_err "$(t 'ui.nohandler'): ${handler:-N/A}"
             return 1

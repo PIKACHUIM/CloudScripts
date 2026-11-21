@@ -18,57 +18,50 @@ ProxyMENU=(
     "tailscale|proxy.tailscale|proxy.tailscale.desc|do_proxy_tailscale"
 )
 
-_run_proxy_installer() {
-    local name="$1" url="$2"; shift 2
-    ui_confirm_install "$name" "$(t "proxy.${3:-}.desc")" || { pika_info "$(t 'ui.cancelled')"; return; }
-    pika_info "$(t 'state.installing') $name..."
-    local proxy_url; proxy_url=$(gh_url "$url")
-    curl -fsSL "$proxy_url" | bash -e "$@"
-    pika_info "$(t 'common.done') - $name"
-}
-
 do_proxy_xui() {
     ui_confirm_install "3X-UI" "$(t 'proxy.xui.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') 3X-UI..."
     # Remove existing installations to avoid conflicts
     rm -rf /usr/local/x-ui 2>/dev/null || true
-    local url=$(gh_url "https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh")
-    curl -fsSL "$url" | bash -e
+    # Repo copy is patched to honour PIKA_GH_PREFIX for GitHub downloads.
+    PIKA_GH_PREFIX="$(pika_gh_prefix)"
+    export PIKA_GH_PREFIX
+    if ! pika_run_remote --errexit "Linux/Tunnels/3x-ui/install.sh"; then
+        pika_err "$(t 'common.error'): 3X-UI"
+        unset PIKA_GH_PREFIX
+        return 0
+    fi
+    unset PIKA_GH_PREFIX
     pika_info "$(t 'common.done') - 3X-UI"
 }
 
 do_proxy_clash() {
     ui_confirm_install "Clash for Linux" "$(t 'proxy.clash.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
-    local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/clash/install.sh")
-    curl -fsSL "$url" | bash -e
+    pika_run_remote --errexit "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/clash/install.sh"
     pika_info "$(t 'common.done') - Clash"
 }
 
 do_proxy_hysteria2() {
     ui_confirm_install "Hysteria2" "$(t 'proxy.hysteria2.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
-    local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/hysteria2/install.sh")
-    curl -fsSL "$url" | bash -e
+    pika_run_remote --errexit "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/hysteria2/install.sh"
     pika_info "$(t 'common.done') - Hysteria2"
 }
 
 do_proxy_ssrust() {
     ui_confirm_install "Shadowsocks-rust" "$(t 'proxy.ssrust.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
-    local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/ss-rust/install.sh")
-    curl -fsSL "$url" | bash -e
+    pika_run_remote --errexit "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/ss-rust/install.sh"
     pika_info "$(t 'common.done') - Shadowsocks-rust"
 }
 
 do_proxy_trojango() {
     ui_confirm_install "Trojan-Go" "$(t 'proxy.trojango.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
-    local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/trojan-go/install.sh")
-    curl -fsSL "$url" | bash -e
+    pika_run_remote --errexit "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/trojan-go/install.sh"
     pika_info "$(t 'common.done') - Trojan-Go"
 }
 
 do_proxy_warp() {
     ui_confirm_install "Cloudflare WARP" "$(t 'proxy.warp.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
-    local url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/warp/install.sh")
-    curl -fsSL "$url" | bash -e
+    pika_run_remote --errexit "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/warp/install.sh"
     pika_info "$(t 'common.done') - WARP"
 }
 
@@ -88,10 +81,11 @@ do_proxy_wgeasy() {
 
     pika_info "$(t 'state.installing') wg-easy..."
     docker stop wg-easy 2>/dev/null || true; docker rm wg-easy 2>/dev/null || true
+    pika_docker_pull "ghcr.io/wg-easy/wg-easy" >/dev/null 2>&1 || true
     local pass_hash; pass_hash=$(docker run --rm ghcr.io/wg-easy/wg-easy wgpw "$pass" 2>/dev/null || echo "$pass")
     docker run -d \
         --name=wg-easy \
-        -e WG_HOST="$(curl -s ifconfig.me 2>/dev/null || curl -s ip.sb 2>/dev/null || echo 'YOUR_SERVER_IP')" \
+        -e WG_HOST="$(curl -s --connect-timeout 3 --max-time 6 ifconfig.me 2>/dev/null || curl -s --connect-timeout 3 --max-time 6 ip.sb 2>/dev/null || echo 'YOUR_SERVER_IP')" \
         -e PASSWORD_HASH="$pass_hash" \
         -e WG_PORT="$wgport" \
         -p "$port:51821" \
@@ -103,7 +97,7 @@ do_proxy_wgeasy() {
         --sysctl="net.ipv4.ip_forward=1" \
         wg-easy/wg-easy 2>/dev/null || \
         docker run -d --name=wg-easy \
-            -e WG_HOST="$(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')" \
+            -e WG_HOST="$(curl -s --connect-timeout 3 --max-time 6 ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')" \
             -e PASSWORD="$pass" \
             -p "$port:51821" -p "$wgport:51820/udp" \
             -v /etc/wireguard:/etc/wireguard \
@@ -119,13 +113,13 @@ do_proxy_wgeasy() {
 do_proxy_zerotier() {
     ui_confirm_install "ZeroTier" "$(t 'proxy.zerotier.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') ZeroTier..."
-    curl -fsSL https://install.zerotier.com | bash -e
+    pika_run_remote --errexit "https://install.zerotier.com"
     pika_info "$(t 'common.done') - ZeroTier"
 }
 
 do_proxy_tailscale() {
     ui_confirm_install "Tailscale" "$(t 'proxy.tailscale.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') Tailscale..."
-    curl -fsSL https://tailscale.com/install.sh | bash -e
+    pika_run_remote --errexit "https://tailscale.com/install.sh"
     pika_info "$(t 'common.done') - Tailscale"
 }

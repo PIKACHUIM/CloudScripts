@@ -48,13 +48,14 @@ bash <(curl -fsSL https://pikash.opkg.cn/Menu.sh)
 | 📥 **5. 软件安装** | Lucky/LobeChat/Halo/SiYuan/DDNS-GO/NPS/Bark 等 53 款热门自托管工具 |
 | 🌐 **6. 代理组网** | 3X-UI/Clash/Hysteria2/SS-rust/Trojan-Go/WARP/WireGuard/wg-easy/ZeroTier/Tailscale |
 | 🛡️ **7. 反向代理** | Caddy / Nginx 二选一：一键安装、站点增删、手动或 ACME 证书 |
-| 🛠️ **8. 系统工具** | SSH加固/时区校时/修改主机名/系统信息/自更新/快捷命令/卸载回滚 |
+| 🛠️ **8. 系统工具** | SSH加固/时区校时/修改主机名/系统信息/**国内网络加速**/自更新/快捷命令/卸载回滚 |
 
-> 国内与海外各有一条独立线路，脚本启动时自动选择可用的那条，无需手动指定加速通道。
+> 国内与海外各有一条独立线路，脚本启动时自动选择可用的那条；安装组件时直连 GitHub 失败会自动切换加速通道，无需手动配置。
 
 ### 新增特性 (v1.0)
 
 - 🌐 **双线路自动选优**：国内 EdgeOne / 海外 GitHub Pages 互为备份，并发探测、24h 缓存，请求全程带超时
+- 🇨🇳 **国内网络加速**：GitHub 下载直连优先、失败自动走加速前缀；软件源 / Docker / npm / pip 一键切换国内镜像
 - 🌍 **中英双语**：默认中文，支持 `--lang=en_US` 手动切换
 - 🔧 **统一服务托管**：PM2 优先 > systemd 次选 > nohup 降级，提供统一的启停/日志/卸载接口
 - 📦 **按需加载**：主入口轻量化 (~230行)，业务模块按需下载缓存
@@ -62,6 +63,19 @@ bash <(curl -fsSL https://pikash.opkg.cn/Menu.sh)
 - 📊 **系统信息卡片**：类似 neofetch 的硬件信息展示（CPU/GPU/内存/磁盘/IP）
 - 🖥️ **修改主机名**：RFC 952/1123 校验，自动更新 /etc/hosts 和 cloud-init
 - 🔄 **脚本自更新**：支持快捷命令 `p` 一键启动
+
+### 国内加速
+
+主菜单 → **8. 系统工具 → 5. 国内网络加速**，集中管理以下四项（全部可逆，改动前自动备份）：
+
+| 项目 | 行为 |
+|:-----|:-----|
+| GitHub 下载 | 直连优先；失败后并发探测 `ghfast.top` / `gh-proxy.com` / `ghproxy.net` / `github.524228.xyz`，选中结果缓存 24h |
+| 系统软件源 | Debian/Ubuntu（含 deb822）、Alpine、Rocky/AlmaLinux/CentOS/Fedora 切换到清华 TUNA，原文件备份为 `*.pika.bak.<时间戳>` |
+| Docker | 官方脚本 + 阿里云源兜底安装，写入 `registry-mirrors`；`ghcr.io` 等镜像拉取失败自动改用 daocloud 镜像 |
+| npm / pip | `registry.npmmirror.com`、清华 PyPI；Node.js 走 npmmirror 下载 |
+
+组件安装脚本（Lucky、OpenList、Aria2 Pro、NPS、1Panel、宝塔、哪吒、3x-ui、Caddy 二进制、acme.sh 等）全部通过统一入口下载，自带超时与加速回退；如需完全直连，使用 `bash Menu.sh --no-accel`。
 
 ### 命令行参数
 
@@ -72,6 +86,7 @@ bash Menu.sh [分类] [项目] [选项]
   --lang=zh_CN|en_US     切换语言
   --mirror=URL            强制指定镜像通道
   --backend=pm2|systemd   强制指定服务后端
+  --no-accel              关闭 GitHub 加速（全部直连）
   --yes, -y               跳过所有确认提示
   --help, -h              显示帮助
 
@@ -92,9 +107,9 @@ bash Menu.sh [分类] [项目] [选项]
 
 | 模块 | 说明 |
 |:-----|:-----|
-| 换大陆镜像源 | Debian/Ubuntu USTC 源自动切换 |
+| 换大陆镜像源 | Debian/Ubuntu/Alpine/Rocky/Alma 自动切换清华源（原文件备份） |
 | 系统初始化 | 更新系统、安装 curl/wget/nano/git/htop/vim 等常用工具 |
-| Docker + 1ms 镜像 | Docker CE + 国内镜像加速 |
+| Docker + 镜像加速 | Docker CE（官方脚本/Aliyun 兜底）+ registry-mirrors |
 | Podman + 镜像 | Podman + registries 镜像加速 |
 | 宝塔面板 | 自动安装并配置用户名、密码、面板端口 |
 | 1Panel | 现代化开源面板一键安装 |

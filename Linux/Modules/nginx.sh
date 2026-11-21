@@ -926,7 +926,7 @@ _nginx_acme_ensure() {
         return 0
     fi
     pika_info "$(t 'nginx.cert.acme.installing')"
-    if ! curl -fsSL --connect-timeout 10 --max-time 120 https://get.acme.sh -o /tmp/pika-acme-$$.sh 2>/dev/null; then
+    if ! pika_fetch "https://get.acme.sh" -o "/tmp/pika-acme-$$.sh" --no-cache --max-time 90; then
         pika_err "$(t 'nginx.cert.acme.installfailed')"
         return 1
     fi

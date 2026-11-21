@@ -12,10 +12,10 @@ PIKA_YELLOW=$(printf '\033[1;33m'); PIKA_BLUE=$(printf '\033[0;34m')
 PIKA_CYAN=$(printf '\033[0;36m');   PIKA_MAGENTA=$(printf '\033[0;35m')
 PIKA_BOLD=$(printf '\033[1m');      PIKA_NC=$(printf '\033[0m')
 
-# ---- Config paths ----
-PIKA_CONFIG_DIR="/etc/pika-sh"
-PIKA_CACHE_DIR="/var/cache/pika-sh"
-PIKA_RUN_DIR="/run/pika-sh"
+# ---- Config paths (overridable for tests / non-standard layouts) ----
+: "${PIKA_CONFIG_DIR:=/etc/pika-sh}"
+: "${PIKA_CACHE_DIR:=/var/cache/pika-sh}"
+: "${PIKA_RUN_DIR:=/run/pika-sh}"
 
 # ---- Ensure directories exist ----
 mkdir -p "$PIKA_CONFIG_DIR" "$PIKA_CACHE_DIR" "$PIKA_RUN_DIR" 2>/dev/null || true

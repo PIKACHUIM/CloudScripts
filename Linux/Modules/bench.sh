@@ -33,7 +33,7 @@ _run_bench() {
     if [ -f "$local_script" ] && [ -s "$local_script" ]; then
         bash "$local_script" "$@"
     else
-        # Download wrapper from CDN
+        # Download wrapper from the selected mirror (dual-site + accelerators)
         local tmpf; tmpf=$(mktemp)
         if pika_fetch "Linux/VPSTest/${script}" -o "$tmpf" 2>/dev/null; then
             chmod +x "$tmpf"
@@ -41,7 +41,8 @@ _run_bench() {
             rm -f "$tmpf"
         else
             rm -f "$tmpf"
-            pika_fetch "Linux/VPSTest/${script}" | bash -e "$@"
+            pika_err "$(t 'common.error'): $script"
+            return 1
         fi
     fi
 }

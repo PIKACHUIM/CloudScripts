@@ -258,8 +258,7 @@ _caddy_apply() {
 # ============================================================
 _caddy_latest_version() {
     local v
-    v=$(curl -fsSL --connect-timeout 5 --max-time 10 \
-        "https://api.github.com/repos/caddyserver/caddy/releases/latest" 2>/dev/null \
+    v=$(pika_gh_api "repos/caddyserver/caddy/releases/latest" 2>/dev/null \
         | grep -m1 '"tag_name"' 2>/dev/null \
         | sed -E 's/.*"v?([0-9]+\.[0-9]+\.[0-9]+)".*/\1/' || true)
     printf '%s' "$v"
@@ -268,19 +267,17 @@ _caddy_latest_version() {
 _caddy_download_binary() {
     local ver="$1" arch="$2" dest="$3"
     local base="https://github.com/caddyserver/caddy/releases/download/v${ver}/caddy_${ver}_linux_${arch}.tar.gz"
-    local proxy_url tmpd archive
+    local tmpd archive
     tmpd=$(mktemp -d 2>/dev/null || echo "/tmp/pika-caddy-$$")
     mkdir -p "$tmpd"
     archive="${tmpd}/caddy.tar.gz"
 
     pika_info "$(t 'caddy.install.fetching') v${ver} (linux/${arch})..."
-    proxy_url=$(gh_url "$base" 2>/dev/null || echo "$base")
-    if ! curl -fSL --connect-timeout 10 --max-time 300 -o "$archive" "$proxy_url" 2>/dev/null; then
-        if ! curl -fSL --connect-timeout 10 --max-time 300 -o "$archive" "$base" 2>/dev/null; then
-            pika_err "$(t 'caddy.install.failed')"
-            rm -rf "$tmpd"
-            return 1
-        fi
+    # pika_fetch tries GitHub directly and then every accelerator prefix.
+    if ! pika_fetch "$base" -o "$archive" --no-cache --max-time 300; then
+        pika_err "$(t 'caddy.install.failed')"
+        rm -rf "$tmpd"
+        return 1
     fi
 
     mkdir -p "${tmpd}/x"
@@ -853,7 +850,7 @@ _caddy_acme_install_tool() {
         return 0
     fi
     pika_info "$(t 'caddy.cert.acme.installing')"
-    if ! curl -fsSL --connect-timeout 10 --max-time 120 https://get.acme.sh -o /tmp/pika-acme-$$.sh 2>/dev/null; then
+    if ! pika_fetch "https://get.acme.sh" -o "/tmp/pika-acme-$$.sh" --no-cache --max-time 90; then
         pika_err "$(t 'caddy.cert.acme.installfailed')"
         return 1
     fi

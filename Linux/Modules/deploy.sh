@@ -25,24 +25,15 @@ DeployMENU=(
 do_mirror() {
     pika_info "$(t 'state.installing') $(t 'deploy.mirror')"
     case "$PIKA_DISTRO" in
-        debian|ubuntu)
-            local distro_ver="$PIKA_DISTRO_VER"
-            if command -v python3 >/dev/null 2>&1; then
-                pika_run_remote "Linux/VPSSets/Setup.sh" mirror
+        debian|ubuntu|devuan|kali|deepin|uos|alpine|rocky|almalinux|centos|fedora)
+            if pika_pkg_mirror_cn; then
+                pika_info "$(t 'common.done') - $(t 'deploy.mirror')"
             else
-                # Ubuntu 24.04+ uses deb822 format
-                if [ "$PIKA_DISTRO" = "ubuntu" ] && [ "${distro_ver%%.*}" -ge 24 ] 2>/dev/null; then
-                    sed -i 's|http://.*archive.ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true
-                else
-                    sed -i 's|http://.*debian.org|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null || true
-                    sed -i 's|http://.*archive.ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null || true
-                fi
+                pika_warn "$(t 'deploy.mirror.failed')"
             fi
-            pkg_update_once
-            pika_info "$(t 'common.done') - $(t 'deploy.mirror')"
             ;;
-        centos|rhel|fedora|rocky|almalinux)
-            pika_run_remote "Linux/VPSSets/Setup.sh" mirror
+        rhel)
+            pika_warn "$(t 'deploy.mirror.failed')"
             ;;
         *)
             pika_warn "$(t 'pkg.nosupport')"
@@ -53,16 +44,8 @@ do_mirror() {
 do_docker() {
     ui_confirm_install "Docker" "$(t 'deploy.docker.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') Docker..."
-    curl -fsSL https://get.docker.com | bash -e
-    # Add China registry mirror
-    mkdir -p /etc/docker
-    cat > /etc/docker/daemon.json << 'EOF'
-{
-  "registry-mirrors": ["https://docker.1ms.run", "https://docker.xuanyuan.me"]
-}
-EOF
-    systemctl restart docker 2>/dev/null || service docker restart 2>/dev/null || true
-    pika_info "$(t 'common.done') - Docker"
+    pika_install_docker || return 1
+    pika_info "$(t 'common.done') - Docker $(docker --version 2>/dev/null | sed 's/^Docker version //;s/,.*//')"
 }
 
 do_podman() {
@@ -74,26 +57,18 @@ do_podman() {
 do_1panel() {
     ui_confirm_install "1Panel" "$(t 'deploy.panel.1panel.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') 1Panel..."
-    curl -fsSL https://resource.fit2cloud.com/1panel/package/quick_start.sh -o /tmp/1panel.sh
-    bash /tmp/1panel.sh
-    rm -f /tmp/1panel.sh
+    pika_run_remote --errexit "https://resource.fit2cloud.com/1panel/package/quick_start.sh"
 }
 
 do_btpanel() {
     ui_confirm_install "$(t 'deploy.panel.bt')" "$(t 'deploy.panel.bt.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') BT Panel..."
-    local bt_url=$(gh_url "https://download.bt.cn/install/install_panel.sh")
-    if [ -n "$bt_url" ]; then
-        curl -fsSL "$bt_url" | bash -e
-    else
-        curl -fsSL https://download.bt.cn/install/install_panel.sh | bash -e
-    fi
+    pika_run_remote --errexit "https://download.bt.cn/install/install_panel.sh"
 }
 
 do_nezha() {
     ui_confirm_install "Nezha Monitor" "$(t 'deploy.panel.nezha.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
-    local install_url=$(gh_url "https://raw.githubusercontent.com/nezhahq/nezha/master/script/install.sh")
-    curl -fsSL "$install_url" | bash -e
+    pika_run_remote --errexit "https://raw.githubusercontent.com/nezhahq/nezha/master/script/install.sh"
 }
 
 do_node() {
@@ -106,8 +81,7 @@ do_netpanel() {
     ui_confirm_install "NetPanel" "$(t 'deploy.panel.netpanel.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') NetPanel..."
     pkg_install curl wget
-    local netpanel_url=$(gh_url "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/netpanel/install.sh")
-    curl -fsSL "$netpanel_url" | bash -e
+    pika_run_remote --errexit "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Tunnels/netpanel/install.sh"
 }
 
 do_easytier() {

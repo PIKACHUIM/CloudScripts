@@ -79,8 +79,9 @@ SoftwareMENU=(
 _soft_ensure_docker() {
     if ! command -v docker >/dev/null 2>&1; then
         pika_info "Docker not found, installing..."
-        curl -fsSL https://get.docker.com | bash -e
+        pika_install_docker || { pika_err "Docker 安装失败"; return 1; }
     fi
+    pika_docker_mirror_setup >/dev/null 2>&1 || true
 }
 
 _soft_docker_run() {
@@ -93,7 +94,7 @@ _soft_docker_run() {
 do_soft_lucky() {
     ui_confirm_install "Lucky" "$(t 'software.lucky.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') Lucky..."
-    curl -sSL https://raw.githubusercontent.com/gdy666/lucky-files/main/golucky.sh 2>/dev/null | bash -e 2>&1 | tail -5
+    pika_run_remote --errexit "https://raw.githubusercontent.com/gdy666/lucky-files/main/golucky.sh"
     pika_info "$(t 'common.done') - 端口:16601 (admin:666/666)"
 }
 
@@ -126,6 +127,7 @@ do_soft_openwebui() {
     _soft_ensure_docker
     mkdir -p /opt/openwebui
     docker rm -f open-webui 2>/dev/null || true
+    pika_docker_pull "ghcr.io/open-webui/open-webui:main" >/dev/null 2>&1 || true
     docker run -d --name=open-webui --restart=always \
         -p 3000:8080 -v /opt/openwebui:/app/backend/data \
         ghcr.io/open-webui/open-webui:main 2>&1 | tail -3
@@ -175,6 +177,7 @@ do_soft_homarr() {
     _soft_ensure_docker
     mkdir -p /opt/homarr
     docker rm -f homarr 2>/dev/null || true
+    pika_docker_pull "ghcr.io/homarr-labs/homarr:latest" >/dev/null 2>&1 || true
     docker run -d --name=homarr --restart=always \
         -p 7575:7575 -v /opt/homarr:/app/data \
         ghcr.io/homarr-labs/homarr:latest 2>&1 | tail -3
@@ -184,7 +187,7 @@ do_soft_homarr() {
 do_soft_sunpanel() {
     ui_confirm_install "Sun-Panel" "$(t 'software.sunpanel.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') Sun-Panel..."
-    bash <(curl -fsSL https://raw.githubusercontent.com/hslr-s/sun-panel/main/script/linux_install.sh) 2>&1 | tail -5
+    pika_run_remote --errexit "https://raw.githubusercontent.com/hslr-s/sun-panel/main/script/linux_install.sh"
     pika_info "$(t 'common.done') - http://localhost:3002"
 }
 
@@ -193,6 +196,7 @@ do_soft_homepage() {
     _soft_ensure_docker
     mkdir -p /opt/homepage/config
     docker rm -f homepage 2>/dev/null || true
+    pika_docker_pull "ghcr.io/gethomepage/homepage:latest" >/dev/null 2>&1 || true
     docker run -d --name=homepage --restart=always \
         -p 3000:3000 -v /opt/homepage/config:/app/config \
         -v /var/run/docker.sock:/var/run/docker.sock \
@@ -264,8 +268,8 @@ do_soft_immich() {
     ui_confirm_install "Immich (照片管理)" "$(t 'software.immich.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     _soft_ensure_docker
     mkdir -p /opt/immich && cd /opt/immich
-    curl -fsSL https://raw.githubusercontent.com/immich-app/immich/main/docker/docker-compose.yml -o docker-compose.yml
-    curl -fsSL https://raw.githubusercontent.com/immich-app/immich/main/docker/.env -o .env
+    pika_fetch "https://raw.githubusercontent.com/immich-app/immich/main/docker/docker-compose.yml" -o docker-compose.yml
+    pika_fetch "https://raw.githubusercontent.com/immich-app/immich/main/docker/.env" -o .env
     docker compose up -d 2>&1 | tail -3
     pika_info "$(t 'common.done') - http://localhost:2283"
 }
@@ -273,7 +277,7 @@ do_soft_immich() {
 do_soft_openlist() {
     ui_confirm_install "OpenList" "$(t 'software.openlist.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') OpenList..."
-    curl -fsSL https://raw.githubusercontent.com/OpenListTeam/OpenList/main/script/install.sh 2>/dev/null | bash -e 2>&1 | tail -5
+    pika_run_remote --errexit "https://raw.githubusercontent.com/OpenListTeam/OpenList/main/script/install.sh"
     pika_info "$(t 'common.done') - http://localhost:5244"
 }
 
@@ -294,7 +298,7 @@ do_soft_qbit() {
 do_soft_aria2pro() {
     ui_confirm_install "Aria2 Pro" "$(t 'software.aria2pro.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') Aria2 Pro..."
-    bash <(curl -fsSL https://raw.githubusercontent.com/P3TERX/Aria2-Pro-Core/master/install.sh) 2>&1 | tail -5
+    pika_run_remote --errexit "https://raw.githubusercontent.com/P3TERX/Aria2-Pro-Core/master/install.sh"
     pika_info "$(t 'common.done') - RPC端口:6800"
 }
 
@@ -314,13 +318,6 @@ do_soft_transmission() {
 }
 
 # ─── 密码与安全 ──────────────────────────────────────────────
-do_soft_nps() {
-    ui_confirm_install "NPS (内网穿透)" "$(t 'software.nps.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
-    pika_info "$(t 'state.installing') NPS..."
-    bash <(curl -fsSL https://ghproxy.net/https://raw.githubusercontent.com/ehang-io/nps/master/scripts/install.sh) 2>&1 | tail -5
-    pika_info "$(t 'common.done') - Web:8080 (admin/123)"
-}
-
 do_soft_vaultwarden() {
     ui_confirm_install "Vaultwarden" "$(t 'software.vaultwarden.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     _soft_ensure_docker
@@ -344,7 +341,10 @@ do_soft_privatebin() {
 do_soft_cloudflareddns() {
     ui_confirm_install "Cloudflare DDNS" "$(t 'software.cloudflareddns.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') Cloudflare DDNS..."
-    curl -fsSL https://raw.githubusercontent.com/wherelse/cloudflareddns/main/cloudflareddns.sh -o /usr/local/bin/cloudflareddns.sh
+    if ! pika_fetch "https://raw.githubusercontent.com/wherelse/cloudflareddns/main/cloudflareddns.sh" -o /usr/local/bin/cloudflareddns.sh; then
+        pika_err "$(t 'common.error'): Cloudflare DDNS"
+        return 1
+    fi
     chmod +x /usr/local/bin/cloudflareddns.sh
     pika_info "$(t 'common.done') - 编辑 /usr/local/bin/cloudflareddns.sh 填入 API Token 后通过 cron 运行"
 }
@@ -363,7 +363,7 @@ do_soft_casdoor() {
 do_soft_nps() {
     ui_confirm_install "NPS (内网穿透)" "$(t 'software.nps.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') NPS..."
-    bash <(curl -fsSL https://ghproxy.net/https://raw.githubusercontent.com/ehang-io/nps/master/scripts/install.sh) 2>&1 | tail -5
+    pika_run_remote --errexit "https://raw.githubusercontent.com/ehang-io/nps/master/scripts/install.sh"
     pika_info "$(t 'common.done') - http://localhost:8080 (admin/123)"
 }
 
@@ -396,7 +396,7 @@ do_soft_syncthing() {
 do_soft_filebrowser() {
     ui_confirm_install "FileBrowser" "$(t 'software.filebrowser.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') FileBrowser..."
-    curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash -e 2>&1 | tail -5
+    pika_run_remote --errexit "https://raw.githubusercontent.com/filebrowser/get/master/get.sh"
     mkdir -p /opt/filebrowser
     filebrowser -d /opt/filebrowser/database.db -a 0.0.0.0 -p 8082 -r / &
     sleep 2
@@ -442,6 +442,7 @@ do_soft_cliproxyapi() {
     _soft_ensure_docker
     mkdir -p /opt/cpa
     docker rm -f cpa 2>/dev/null || true
+    pika_docker_pull "ghcr.io/router-for-me/cliproxyapi:latest" >/dev/null 2>&1 || true
     docker run -d --name=cpa --restart=always \
         -p 3000:3000 -v /opt/cpa:/app/data \
         -e CPA_ADMIN_USER=admin -e CPA_ADMIN_PASS=admin123 \
@@ -454,6 +455,7 @@ do_soft_sub2api() {
     _soft_ensure_docker
     mkdir -p /opt/sub2api
     docker rm -f sub2api 2>/dev/null || true
+    pika_docker_pull "ghcr.io/wei-shaw/sub2api:latest" >/dev/null 2>&1 || true
     docker run -d --name=sub2api --restart=always \
         -p 3000:3000 -v /opt/sub2api:/app/data \
         -e ADMIN_USER=admin -e ADMIN_PASS=admin123 \
@@ -563,6 +565,7 @@ do_soft_homebox() {
     _soft_ensure_docker
     mkdir -p /opt/homebox
     docker rm -f homebox 2>/dev/null || true
+    pika_docker_pull "ghcr.io/sysadminsmedia/homebox:latest" >/dev/null 2>&1 || true
     docker run -d --name=homebox --restart=always \
         -p 7745:7745 -v /opt/homebox:/data \
         ghcr.io/sysadminsmedia/homebox:latest 2>&1 | tail -3
@@ -653,6 +656,6 @@ do_soft_speedtest() {
 do_soft_mcsmanager() {
     ui_confirm_install "MCSManager" "$(t 'software.mcsmanager.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
     pika_info "$(t 'state.installing') MCSManager..."
-    curl -sSL https://script.mcsmanager.com/setup.sh 2>/dev/null | bash -e 2>&1 | tail -5
+    pika_run_remote --errexit "https://script.mcsmanager.com/setup.sh"
     pika_info "$(t 'common.done') - http://localhost:23333"
 }
