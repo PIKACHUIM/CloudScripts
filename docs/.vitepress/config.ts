@@ -1,17 +1,21 @@
 import { defineConfig } from "vitepress";
 
 export default defineConfig({
-  title: "CloudScripts",
+  title: "PIKA SH",
   description: "皮卡在线脚本托管平台 - 一站式服务器管理脚本",
   lang: "zh-CN",
   lastUpdated: true,
 
+  head: [["link", { rel: "icon", type: "image/svg+xml", href: "/logo.svg" }]],
+
   themeConfig: {
     logo: "/logo.svg",
+    siteTitle: "PIKA SH",
 
     nav: [
       { text: "首页", link: "/" },
       { text: "使用指南", link: "/guide/getting-started" },
+      { text: "镜像通道", link: "/guide/mirror" },
     ],
 
     sidebar: {
@@ -42,7 +46,7 @@ export default defineConfig({
 
     footer: {
       message: "基于 GNU GPL v3 许可证发布",
-      copyright: "Copyright © 2024 CloudScripts",
+      copyright: "Copyright © 2024-2026 PIKA SH",
     },
 
     search: {

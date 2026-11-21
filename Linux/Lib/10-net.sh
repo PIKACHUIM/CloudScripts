@@ -8,14 +8,22 @@ set -e
 
 # ---- Mirror chain (ordered by preference, fastest first) ----
 # User can override via PIKA_MIRROR env var or --mirror CLI arg
+# The two PIKA SH sites serve the identical tree:
+#   pikash.pika.net.cn = Tencent EdgeOne Pages (mainland reachable)
+#   pikash.opkg.cn     = GitHub Pages (overseas)
+PIKA_SITE_CN="${PIKA_SITE_CN:-https://pikash.pika.net.cn}"
+PIKA_SITE_INTL="${PIKA_SITE_INTL:-https://pikash.opkg.cn}"
+PIKA_SITE_RAW="${PIKA_SITE_RAW:-https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main}"
+
 PIKA_MIRRORS_DEFAULT=(
+    "$PIKA_SITE_CN"                             # Mainland edge (EdgeOne Pages)
+    "$PIKA_SITE_INTL"                           # Overseas mirror (GitHub Pages)
     "https://benchs.pika.net.cn"                # Assets mirror (Pages)
     "https://gh-vps.pika.net.cn"                # VPS scripts mirror (Pages)
-    "https://pikash.opkg.cn"                # Main scripts mirror (Pages)
     "https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
     "https://ghfast.top/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
     "https://gh-proxy.com/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
-    "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
+    "$PIKA_SITE_RAW"
 )
 
 PIKA_MIRROR_CACHE="${PIKA_CACHE_DIR}/mirror.conf"
@@ -23,69 +31,65 @@ PIKA_MIRROR_TTL=86400   # 24 hours
 
 # ---- Verify that a healthz endpoint is really our server ----
 # Returns 0 if probe passes, non-zero otherwise
-# Uses both HTTP status code AND content feature check to defeat DNS poisoning
+# Uses both HTTP status code AND content feature check to defeat DNS poisoning.
+# Two probe paths are tried because some static hosts strip dotfiles.
 _probe_mirror() {
-    local base="$1" probe_url="${base}/.pika-healthz"
-    local code tmpfile
-    tmpfile=$(mktemp) || return 1
-
-    # Fast probe: HTTP 200 + PIKA_SH_OK magic string
-    code=$(curl -fsSL -o "$tmpfile" -w '%{http_code}' \
-           --connect-timeout 3 --max-time 8 \
-           "$probe_url" 2>/dev/null) || { rm -f "$tmpfile"; return 1; }
-
-    if [ "$code" = "200" ] && grep -q 'PIKA_SH_OK' "$tmpfile" 2>/dev/null; then
+    local base="$1" path tmpfile code answered=0
+    for path in ".pika-healthz" "pika-healthz.txt"; do
+        tmpfile=$(mktemp) || return 1
+        # Fast probe: HTTP 200 + PIKA_SH_OK magic string. No -f here so the
+        # status code is always available and the txt fallback can be tried.
+        code=$(curl -sSL -o "$tmpfile" -w '%{http_code}' \
+               --connect-timeout 2 --max-time 4 \
+               "${base}/${path}" 2>/dev/null) || code=""
+        if [ -n "$code" ]; then
+            answered=1
+        fi
+        if [ "$code" = "200" ] && grep -q 'PIKA_SH_OK' "$tmpfile" 2>/dev/null; then
+            rm -f "$tmpfile"
+            pika_debug "Mirror probe OK: $base"
+            return 0
+        fi
         rm -f "$tmpfile"
-        pika_debug "Mirror probe OK: $base"
-        return 0
-    fi
-    rm -f "$tmpfile"
+        [ "$answered" = "0" ] && return 1
+    done
     return 1
 }
 
-# ---- Probe first N mirrors concurrently, take first success ----
+# ---- Probe every mirror concurrently, take the first healthy answer ----
+# Hard 5s budget: a blocked or black-holed host costs at most one probe and
+# can never stall the menu, even when a whole region is unreachable.
 _probe_mirror_fast() {
-    local -n candidates=$1
-    local max_parallel="${2:-3}"
-    local tmpd result
+    local -n _cands=$1
+    local tmpd="" result="" i=0 pid
+    local pids=()
 
-    tmpd=$(mktemp -d) || { echo "${candidates[-1]}"; return; }
-    local pids=() count=0
+    tmpd=$(mktemp -d 2>/dev/null) || return 1
 
-    for m in "${candidates[@]}"; do
-        (_probe_mirror "$m" && echo "$m" > "$tmpd/ok.$count") &
+    for m in "${_cands[@]}"; do
+        ( _probe_mirror "$m" && printf '%s\n' "$m" > "$tmpd/ok.${i}" ) &
         pids+=($!)
-        count=$((count + 1))
-        [ $count -ge "$max_parallel" ] && break
+        i=$((i + 1))
     done
 
-    # Wait for first success or all done (timeout 10s total)
     local waited=0
-    while [ $waited -lt 10 ]; do
+    while [ "$waited" -lt 25 ]; do
         for f in "$tmpd"/ok.*; do
-            [ -f "$f" ] && { read -r result < "$f"; rm -rf "$tmpd"; echo "$result"; return 0; }
+            if [ -f "$f" ]; then
+                result=$(sed -n '1p' "$f")
+                for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done
+                rm -rf "$tmpd"
+                printf '%s' "$result"
+                return 0
+            fi
         done
-        sleep 0.5
+        sleep 0.2
         waited=$((waited + 1))
     done
 
-    # Kill remaining probes
     for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done
+    wait "${pids[@]}" 2>/dev/null || true
     rm -rf "$tmpd"
-
-    # None succeeded from first batch; try the rest
-    return 1
-}
-
-# ---- Full probe: try all mirrors in order ----
-_probe_mirror_sequential() {
-    local -n cands=$1
-    for m in "${cands[@]}"; do
-        if _probe_mirror "$m"; then
-            echo "$m"
-            return 0
-        fi
-    done
     return 1
 }
 
@@ -96,46 +100,49 @@ _pika_select_mirror() {
     # If user forced a mirror, use it directly (no probing needed)
     if [ -n "${PIKA_MIRROR:-}" ]; then
         pika_debug "Using user-specified mirror: $PIKA_MIRROR"
-        echo "$PIKA_MIRROR"
+        printf '%s' "${PIKA_MIRROR%/}"
+        return 0
+    fi
+
+    # The bootstrap already picked (and cached) the closest reachable site
+    if [ -n "${PIKA_SITE_BASE:-}" ]; then
+        pika_debug "Using bootstrapped site: $PIKA_SITE_BASE"
+        printf '%s' "$PIKA_SITE_BASE"
         return 0
     fi
 
     # Check cache
     if [ -f "$PIKA_MIRROR_CACHE" ]; then
-        cached=$(head -1 "$PIKA_MIRROR_CACHE" 2>/dev/null || true)
+        cached=$(sed -n '1p' "$PIKA_MIRROR_CACHE" 2>/dev/null || true)
         cached_ts=$(sed -n '2p' "$PIKA_MIRROR_CACHE" 2>/dev/null || echo 0)
+        case "$cached_ts" in ''|*[!0-9]*) cached_ts=0 ;; esac
         now=$(date +%s)
         if [ -n "$cached" ] && [ $((now - cached_ts)) -lt "$PIKA_MIRROR_TTL" ]; then
             # Verify cached mirror is still alive (quick check)
             if _probe_mirror "$cached"; then
-                echo "$cached"
+                printf '%s' "$cached"
                 return 0
             fi
             pika_warn "Cached mirror $cached no longer reachable, re-probing..."
         fi
     fi
 
-    # Probe: fast concurrent first, then sequential
     pika_info "正在探测最优下载通道..."
-    best=$(_probe_mirror_fast PIKA_MIRRORS_DEFAULT 3 2>/dev/null || true)
-    if [ -z "$best" ]; then
-        best=$(_probe_mirror_sequential PIKA_MIRRORS_DEFAULT 2>/dev/null || true)
-    fi
-
+    best=$(_probe_mirror_fast PIKA_MIRRORS_DEFAULT 2>/dev/null || true)
     if [ -n "$best" ]; then
-        # Cache result
-        printf '%s\n%s\n' "$best" "$(date +%s)" > "$PIKA_MIRROR_CACHE"
-        echo "$best"
+        printf '%s\n%s\n' "$best" "$(date +%s)" > "$PIKA_MIRROR_CACHE" 2>/dev/null || true
+        printf '%s' "$best"
         return 0
     fi
 
-    # Ultimate fallback: raw GitHub
+    # Ultimate fallback: raw GitHub (may be blocked, but every attempt is bounded)
     pika_warn "所有代理通道不可用，回退到直连 (可能较慢)"
-    echo "${PIKA_MIRRORS_DEFAULT[-1]}"
+    printf '%s' "$PIKA_SITE_RAW"
 }
 
 # Export selected mirror base URL (lazy init)
-PIKA_MIRROR_BASE=""
+# Reuse whatever the launcher/bootstrap already resolved.
+PIKA_MIRROR_BASE="${PIKA_SITE_BASE:-}"
 
 pika_init_mirror() {
     [ -n "$PIKA_MIRROR_BASE" ] && return
@@ -152,7 +159,7 @@ pika_init_mirror() {
 # ============================================================
 pika_fetch() {
     local url="" outfile="-" use_cache=1 expect_hash=""
-    local retries=3 retry_delay=2
+    local retries=2 retry_delay=1
 
     # Parse args
     while [ $# -gt 0 ]; do
@@ -168,9 +175,14 @@ pika_fetch() {
     [ -z "$url" ] && { pika_err "pika_fetch: no URL specified"; return 1; }
 
     # Resolve URL: relative paths use mirror, absolute URLs are direct
+    local rel=""
     case "$url" in
         *://*) ;;  # Absolute URL, use as-is
-        *) pika_init_mirror; url="${PIKA_MIRROR_BASE}/${url#/}" ;;
+        *)
+            rel="${url#/}"
+            pika_init_mirror
+            url="${PIKA_MIRROR_BASE}/${rel}"
+            ;;
     esac
 
     # Check local cache (by URL hash)
@@ -201,14 +213,14 @@ pika_fetch() {
         attempt=$((attempt + 1))
         pika_debug "Fetch ($attempt/$retries): $url"
 
-        if curl -fSL --connect-timeout 10 --max-time 120 -o "$tmpf" "$url" 2>/dev/null; then
+        if curl -fSL --connect-timeout 5 --max-time 60 -o "$tmpf" "$url" 2>/dev/null; then
             success=1
             break
         fi
 
         # Try wget as fallback
         if command -v wget >/dev/null 2>&1; then
-            if wget -q --timeout=10 --tries=1 -O "$tmpf" "$url" 2>/dev/null; then
+            if wget -q --timeout=15 --tries=1 -O "$tmpf" "$url" 2>/dev/null; then
                 success=1
                 break
             fi
@@ -216,6 +228,27 @@ pika_fetch() {
 
         [ $attempt -lt $retries ] && sleep "$retry_delay"
     done
+
+    # Relative paths: retry once on the sibling deployment, then on raw GitHub.
+    # The mainland edge and the overseas mirror are independent, so a single
+    # unreachable site must not break every download.
+    if [ "$success" != "1" ] && [ -n "$rel" ]; then
+        local alt_base
+        case "$PIKA_MIRROR_BASE" in
+            *pikash.pika.net.cn*) alt_base="$PIKA_SITE_INTL" ;;
+            *)                    alt_base="$PIKA_SITE_CN" ;;
+        esac
+        local alt
+        for alt in "$alt_base" "$PIKA_SITE_RAW"; do
+            [ "$alt" = "$PIKA_MIRROR_BASE" ] && continue
+            pika_warn "主通道不可用，尝试备用通道: $alt"
+            if curl -fSL --connect-timeout 5 --max-time 60 -o "$tmpf" "${alt}/${rel}" 2>/dev/null; then
+                success=1
+                url="${alt}/${rel}"
+                break
+            fi
+        done
+    fi
 
     if [ "$success" != "1" ]; then
         rm -f "$tmpf"

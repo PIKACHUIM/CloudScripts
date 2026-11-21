@@ -76,21 +76,156 @@ done
 # Export for sub-shells
 export PIKA_YES PIKA_LANG PIKA_MIRROR PIKA_SVC_BACKEND_MODE
 
+# ---- Site endpoints (mainland edge first, then overseas) ----
+# Two independent deployments serve the same tree:
+#   pikash.pika.net.cn  -> Tencent EdgeOne Pages (mainland reachable)
+#   pikash.opkg.cn      -> GitHub Pages (overseas)
+# Every request carries hard timeouts so an unreachable host can never stall
+# the menu, and the reachable one is picked automatically.
+PIKA_SITE_CN="https://pikash.pika.net.cn"
+PIKA_SITE_INTL="https://pikash.opkg.cn"
+PIKA_SITE_RAW="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
+PIKA_SITE_BASE=""
+: "${PIKA_CACHE_DIR:=/var/cache/pika-sh}"
+
+# Download one URL with hard timeouts (curl preferred, wget fallback).
+_pika_bootstrap_get() {
+    local url="$1" out="$2" max_time="${3:-15}"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --connect-timeout 2 --max-time "$max_time" -o "$out" "$url" 2>/dev/null && return 0
+        return 1
+    fi
+    if command -v wget >/dev/null 2>&1; then
+        wget -q -T "$max_time" -t 1 -O "$out" "$url" 2>/dev/null && return 0
+    fi
+    return 1
+}
+
+# Health probe: HTTP 200 + magic string, so a hijacked/parked host is rejected.
+# A network-level failure returns immediately; the alternate path is only
+# tried when the host answered but the dotfile was not served.
+_pika_site_ok() {
+    local base="$1" path tmp code answered=0
+    for path in ".pika-healthz" "pika-healthz.txt"; do
+        tmp=$(mktemp 2>/dev/null) || return 1
+        code=$(curl -sSL -o "$tmp" -w '%{http_code}' \
+               --connect-timeout 2 --max-time 4 "${base}/${path}" 2>/dev/null) || code=""
+        if [ -n "$code" ]; then
+            answered=1
+        fi
+        if [ "$code" = "200" ] && grep -q 'PIKA_SH_OK' "$tmp" 2>/dev/null; then
+            rm -f "$tmp"
+            return 0
+        fi
+        rm -f "$tmp"
+        [ "$answered" = "0" ] && return 1
+    done
+    return 1
+}
+
+# Probe both sites in parallel; the first healthy answer wins (~1 RTT).
+_pika_pick_site() {
+    local tmpd w winner="" p1="" p2=""
+    tmpd=$(mktemp -d 2>/dev/null) || { printf '%s' ""; return 0; }
+
+    ( _pika_site_ok "$PIKA_SITE_CN" && printf '%s\n' "$PIKA_SITE_CN" > "$tmpd/cn" ) &
+    p1=$!
+    ( _pika_site_ok "$PIKA_SITE_INTL" && printf '%s\n' "$PIKA_SITE_INTL" > "$tmpd/intl" ) &
+    p2=$!
+
+    w=0
+    while [ "$w" -lt 20 ]; do
+        if [ -s "$tmpd/cn" ]; then
+            winner=$(sed -n '1p' "$tmpd/cn")
+            break
+        fi
+        if [ -s "$tmpd/intl" ]; then
+            winner=$(sed -n '1p' "$tmpd/intl")
+            break
+        fi
+        sleep 0.2
+        w=$((w + 1))
+    done
+
+    kill "$p1" "$p2" 2>/dev/null || true
+    wait "$p1" "$p2" 2>/dev/null || true
+    rm -rf "$tmpd"
+    printf '%s' "$winner"
+}
+
+# Resolve the base URL once: explicit override > cached choice > live probe.
+_pika_resolve_site() {
+    local cache="${PIKA_CACHE_DIR}/site.conf" base ts now
+
+    if [ -n "${PIKA_SITE_BASE:-}" ]; then
+        printf '%s' "$PIKA_SITE_BASE"
+        return 0
+    fi
+    if [ -n "${PIKA_MIRROR:-}" ]; then
+        printf '%s' "${PIKA_MIRROR%/}"
+        return 0
+    fi
+
+    if [ -f "$cache" ]; then
+        base=$(sed -n '1p' "$cache" 2>/dev/null || true)
+        ts=$(sed -n '2p' "$cache" 2>/dev/null || echo 0)
+        case "$ts" in ''|*[!0-9]*) ts=0 ;; esac
+        now=$(date +%s)
+        if [ -n "$base" ] && [ $((now - ts)) -lt 86400 ] && _pika_site_ok "$base"; then
+            printf '%s' "$base"
+            return 0
+        fi
+    fi
+
+    printf '%s\n' "[*] 探测下载线路 / probing mirrors..." >&2
+    base=$(_pika_pick_site)
+    if [ -z "$base" ]; then
+        base="$PIKA_SITE_RAW"
+    else
+        mkdir -p "$PIKA_CACHE_DIR" 2>/dev/null || true
+        printf '%s\n%s\n' "$base" "$(date +%s)" > "$cache" 2>/dev/null || true
+    fi
+    printf '%s' "$base"
+}
+
 # ---- Bootstrap: load core libraries ----
 _bootstrap() {
+    : "${PIKA_CACHE_DIR:=/var/cache/pika-sh}"
+    export PIKA_CACHE_DIR
+
     # Ensure basic tools exist (minimal, before full pkg abstraction loads)
     command -v curl >/dev/null 2>&1 || { apt-get update -qq 2>/dev/null && apt-get install -y -qq curl 2>/dev/null; } || true
-    command -v mktemp >/dev/null 2>&1 || command -v curl >/dev/null 2>&1 || { echo "ERROR: curl or wget required." >&2; exit 1; }
+    command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || { echo "ERROR: curl or wget required." >&2; exit 1; }
 
-    # Load core library (local first, then fetch from CDN)
+    # Pick the closest reachable mirror once, reuse it for every library
+    local base; base=$(_pika_resolve_site)
+    PIKA_SITE_BASE="$base"
+    export PIKA_SITE_BASE
+
+    # Load core library (local first, then fetch from the chosen site)
     local lib_core="${PIKA_LIB_DIR}/00-core.sh"
     if [ ! -f "$lib_core" ]; then
-        _tmp_core=$(mktemp)
-        curl -fsSL "https://pikash.opkg.cn/Linux/Lib/00-core.sh" -o "$_tmp_core" 2>/dev/null || \
-            curl -fsSL "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Lib/00-core.sh" -o "$_tmp_core" || \
-            { echo "ERROR: Cannot load core library." >&2; rm -f "$_tmp_core"; exit 1; }
-        . "$_tmp_core"
-        rm -f "$_tmp_core"
+        local tmp_core; tmp_core=$(mktemp)
+        local loaded_core=0
+        if _pika_bootstrap_get "${PIKA_SITE_BASE}/Linux/Lib/00-core.sh" "$tmp_core"; then
+            loaded_core=1
+        elif [ "$PIKA_SITE_BASE" != "$PIKA_SITE_RAW" ] && \
+             _pika_bootstrap_get "${PIKA_SITE_RAW}/Linux/Lib/00-core.sh" "$tmp_core"; then
+            loaded_core=1
+        fi
+        if [ "$loaded_core" -ne 1 ]; then
+            echo "ERROR: 无法连接任何下载线路 / no reachable mirror." >&2
+            echo "       请检查网络，或用 --mirror=URL 指定可用镜像。" >&2
+            rm -f "$tmp_core"
+            exit 1
+        fi
+        if ! bash -n "$tmp_core" 2>/dev/null; then
+            echo "ERROR: core library is corrupted." >&2
+            rm -f "$tmp_core"
+            exit 1
+        fi
+        . "$tmp_core"
+        rm -f "$tmp_core"
     else
         . "$lib_core"
     fi
@@ -115,14 +250,29 @@ _load_lib() {
     local local_path="${PIKA_LIB_DIR}/${f}"
     if [ -f "$local_path" ]; then
         . "$local_path"
-    else
-        local tmpf; tmpf=$(mktemp)
-        curl -fsSL "https://pikash.opkg.cn/Linux/Lib/${f}" -o "$tmpf" 2>/dev/null || \
-            curl -fsSL "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Lib/${f}" -o "$tmpf" || \
-            { pika_warn "Cannot load: $f"; rm -f "$tmpf"; return 1; }
-        . "$tmpf"
-        rm -f "$tmpf"
+        return 0
     fi
+
+    local tmpf; tmpf=$(mktemp)
+    local ok=0
+    if _pika_bootstrap_get "${PIKA_SITE_BASE}/Linux/Lib/${f}" "$tmpf" 10; then
+        ok=1
+    elif [ "$PIKA_SITE_BASE" != "$PIKA_SITE_RAW" ] && \
+         _pika_bootstrap_get "${PIKA_SITE_RAW}/Linux/Lib/${f}" "$tmpf" 10; then
+        ok=1
+    fi
+    if [ "$ok" -ne 1 ]; then
+        pika_warn "Cannot load: $f"
+        rm -f "$tmpf"
+        return 1
+    fi
+    if ! bash -n "$tmpf" 2>/dev/null; then
+        pika_warn "Invalid library: $f"
+        rm -f "$tmpf"
+        return 1
+    fi
+    . "$tmpf"
+    rm -f "$tmpf"
 }
 
 # ---- Module loader (lazy, caches to /var/cache/pika-sh/modules) ----
@@ -146,7 +296,8 @@ _load_module() {
     # other source, instead of sourcing a file with a syntax error.
     _pika_fetch_checked() {
         local url="$1" out="$2"
-        if curl -fsSL "$url" -o "$out" 2>/dev/null || wget -qO "$out" "$url" 2>/dev/null; then
+        if curl -fsSL --connect-timeout 3 --max-time 25 "$url" -o "$out" 2>/dev/null || \
+           wget -q -T 25 -t 1 -O "$out" "$url" 2>/dev/null; then
             if bash -n "$out" 2>/dev/null; then
                 return 0
             fi
@@ -154,7 +305,7 @@ _load_module() {
         return 1
     }
 
-    # 1) CDN mirror (China-friendly)
+    # 1) Preferred mirror (already resolved during bootstrap)
     rm -f "${cache_dir}/${mod}"
     if pika_fetch "Linux/Modules/${mod}" -o "$tmpf" 2>/dev/null && bash -n "$tmpf" 2>/dev/null; then
         mv -f "$tmpf" "$cached"
@@ -163,9 +314,21 @@ _load_module() {
     fi
     rm -f "$tmpf"
 
-    # 2) Fallback: live GitHub source (always reflects current repo HEAD)
-    local raw_url="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Modules/${mod}"
-    if _pika_fetch_checked "$raw_url" "$tmpf"; then
+    # 2) The other site (mainland <-> overseas), covers a single-line outage
+    local other_site="$PIKA_SITE_INTL"
+    case "$PIKA_SITE_BASE" in
+        *pikash.pika.net.cn*) other_site="$PIKA_SITE_INTL" ;;
+        *pikash.opkg.cn*)     other_site="$PIKA_SITE_CN" ;;
+    esac
+    if _pika_fetch_checked "${other_site}/Linux/Modules/${mod}" "$tmpf"; then
+        mv -f "$tmpf" "$cached"
+        . "$cached"
+        return
+    fi
+    rm -f "$tmpf"
+
+    # 3) Last resort: live GitHub source (always reflects current repo HEAD)
+    if _pika_fetch_checked "${PIKA_SITE_RAW}/Linux/Modules/${mod}" "$tmpf"; then
         mv -f "$tmpf" "$cached"
         . "$cached"
         return
@@ -241,17 +404,21 @@ menu_install_local() {
 #!/usr/bin/env bash
 # pikash launcher — always runs the latest Menu.sh
 set -e
-PIKA_URL="https://pikash.opkg.cn/Menu.sh"
 PIKA_RAW="https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh"
 CACHE_DIR="${PIKA_CACHE_DIR:-/var/cache/pika-sh}"
 CACHED="$CACHE_DIR/Menu.sh"
 TMP="$(mktemp 2>/dev/null || echo "/tmp/pikash-$$.sh")"
 fetch_ok=0
-if curl -fsSL "$PIKA_URL" -o "$TMP" 2>/dev/null || wget -qO "$TMP" "$PIKA_URL" 2>/dev/null; then
-    if bash -n "$TMP" 2>/dev/null; then fetch_ok=1; fi
-fi
+# Mainland edge first, then the overseas mirror; both bounded by timeouts.
+for base in "https://pikash.pika.net.cn" "https://pikash.opkg.cn"; do
+    if curl -fsSL --connect-timeout 3 --max-time 25 "$base/Menu.sh" -o "$TMP" 2>/dev/null || \
+       wget -q -T 25 -t 1 -O "$TMP" "$base/Menu.sh" 2>/dev/null; then
+        if bash -n "$TMP" 2>/dev/null; then fetch_ok=1; break; fi
+    fi
+done
 if [ "$fetch_ok" -ne 1 ]; then
-    if curl -fsSL "$PIKA_RAW" -o "$TMP" 2>/dev/null || wget -qO "$TMP" "$PIKA_RAW" 2>/dev/null; then
+    if curl -fsSL --connect-timeout 3 --max-time 25 "$PIKA_RAW" -o "$TMP" 2>/dev/null || \
+       wget -q -T 25 -t 1 -O "$TMP" "$PIKA_RAW" 2>/dev/null; then
         if bash -n "$TMP" 2>/dev/null; then fetch_ok=1; fi
     fi
 fi

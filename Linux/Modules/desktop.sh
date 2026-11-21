@@ -22,7 +22,7 @@ DesktopMENU=(
     "niri|desktop.niri|desktop.niri.desc|do_desktop_niri"
 )
 
-PIKA_DESKTOP_CDN="${PIKA_MIRROR_BASE:-https://pikash.opkg.cn}/Linux/Desktop"
+PIKA_DESKTOP_CDN="${PIKA_MIRROR_BASE:-https://pikash.pika.net.cn}/Linux/Desktop"
 
 # ---- Generic desktop installer: fetch and run remote script ----
 _de_install() {
@@ -31,34 +31,21 @@ _de_install() {
     ui_confirm_install "$name" "$(t "desktop.${icon:-server}.desc")" || { pika_info "$(t 'ui.cancelled')"; return; }
 
     pika_info "$(t 'desk.checking')"
-    # Download and execute via the dispatch function in commons.sh
+    # Download through the mirror chain (mainland edge -> overseas -> raw),
+    # each attempt time-bounded so an unreachable site cannot hang the menu.
     local _tmp_script="/tmp/pika_de_$$.sh"
-    if command -v curl >/dev/null 2>&1; then
-        if curl -fsSL "${PIKA_DESKTOP_CDN}/${script}" -o "$_tmp_script"; then
-            chmod +x "$_tmp_script"
-            if bash -e "$_tmp_script"; then
-                rm -f "$_tmp_script"
-                pika_info "$(t 'common.done') - $name"
-            else
-                rm -f "$_tmp_script"
-                pika_err "$(t 'common.error'): $name"
-            fi
-        else
-            pika_err "$(t 'common.error'): $name (download failed)"
-        fi
+    if ! pika_fetch --no-cache "Linux/Desktop/${script}" -o "$_tmp_script"; then
+        pika_err "$(t 'common.error'): $name (download failed)"
+        return
+    fi
+
+    chmod +x "$_tmp_script"
+    if bash -e "$_tmp_script"; then
+        rm -f "$_tmp_script"
+        pika_info "$(t 'common.done') - $name"
     else
-        if wget -qO "$_tmp_script" "${PIKA_DESKTOP_CDN}/${script}"; then
-            chmod +x "$_tmp_script"
-            if bash -e "$_tmp_script"; then
-                rm -f "$_tmp_script"
-                pika_info "$(t 'common.done') - $name"
-            else
-                rm -f "$_tmp_script"
-                pika_err "$(t 'common.error'): $name"
-            fi
-        else
-            pika_err "$(t 'common.error'): $name (download failed)"
-        fi
+        rm -f "$_tmp_script"
+        pika_err "$(t 'common.error'): $name"
     fi
 }
 

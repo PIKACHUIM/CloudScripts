@@ -47,7 +47,7 @@ t() {
 _i18n_source_pack() {
     local lang="$1"   # e.g., "zh_CN" or "en_US"
     local pack_file="I18n/${lang}.sh"
-    local local_path remote_url loaded=0
+    local local_path loaded=0
 
     # ----- Try PIKA_BASE/Linux/I18n/xx.sh (correct local path) -----
     local_path="${PIKA_BASE:-.}/Linux/${pack_file}"
@@ -56,21 +56,22 @@ _i18n_source_pack() {
         loaded=1
     fi
 
-    # ----- Try CDN fallback -----
+    # ----- Remote fallback: both deployments + raw, every attempt time-bounded -----
     if [ "$loaded" = "0" ]; then
         local tmpf; tmpf=$(mktemp 2>/dev/null || echo "/tmp/pika-i18n-$$")
-        # Try multiple CDN sources
         for base_url in \
-            "https://pikash.opkg.cn/Linux/${pack_file}" \
-            "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/${pack_file}" \
-            "https://github.524228.xyz/PIKACHUIM/CloudScripts/main/Linux/${pack_file}"
+            "${PIKA_SITE_BASE:-https://pikash.pika.net.cn}" \
+            "https://pikash.pika.net.cn" \
+            "https://pikash.opkg.cn" \
+            "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"
         do
-            if curl -fsSL "$base_url" -o "$tmpf" 2>/dev/null; then
+            if curl -fsSL --connect-timeout 3 --max-time 20 \
+                    "${base_url}/Linux/${pack_file}" -o "$tmpf" 2>/dev/null; then
                 . "$tmpf"
                 loaded=1
                 break
             fi
-            if wget -qO "$tmpf" "$base_url" 2>/dev/null; then
+            if wget -q -T 20 -t 1 -O "$tmpf" "${base_url}/Linux/${pack_file}" 2>/dev/null; then
                 . "$tmpf"
                 loaded=1
                 break

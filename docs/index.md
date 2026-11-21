@@ -2,67 +2,92 @@
 layout: home
 
 hero:
-  name: "CloudScripts"
-  text: "皮卡在线脚本托管平台"
-  tagline: 一站式服务器管理脚本，一行命令搞定部署、测评、清理、桌面安装
+  name: PIKA SH
+  text: 皮卡在线脚本托管平台
+  tagline: 一行命令搞定部署、测评、维护与反向代理，国内 / 海外双线路自动选优
+  image:
+    src: /logo.svg
+    alt: PIKA SH
   actions:
     - theme: brand
       text: 快速开始
       link: /guide/getting-started
     - theme: alt
-      text: 查看脚本
+      text: 脚本清单
       link: /guide/linux-scripts
+    - theme: alt
+      text: GitHub
+      link: https://github.com/PIKACHUIM/CloudScripts
 
 features:
   - icon: 🚀
-    title: 一键执行
-    details: 通过 Menu.sh 总菜单自动识别系统并展示对应功能，也可 bash 一行命令远程执行任意脚本，无需克隆仓库，无需手动下载。
+    title: 一行即用
+    details: 无需克隆仓库，curl 一行拉起总菜单，按编号执行即可。所有脚本同时可通过 URL 单独调用。
+  - icon: 🌏
+    title: 双线路自动选优
+    details: pikash.pika.net.cn（国内 EdgeOne）与 pikash.opkg.cn（海外）互为备份，启动时并发探测、就近取用，结果缓存 24 小时。
+  - icon: ⏱️
+    title: 全程超时保护
+    details: 每个请求都带连接与总时长上限，线路不可达时几秒内切换，不会出现脚本卡死不动的情况。
   - icon: 🐧
     title: Linux 全覆盖
-    details: 涵盖 VPS 部署、性能测评、系统清理、图形桌面安装、代理面板部署、组网服务、中转服务等 30+ 脚本。
-  - icon: 🪟
-    title: Windows 支持
-    details: 提供 Docker CE、Nerdctl、Mirantis 容器引擎安装脚本，以及 Windows/Office 激活工具。
+    details: 部署、维护、桌面环境、性能测评、代理组网、反向代理六大类，覆盖 Debian/Ubuntu/RHEL/Alpine 等主流发行版。
+  - icon: 🛡️
+    title: 反向代理二选一
+    details: Caddy 与 Nginx 任选其一，一键安装、站点增删、手动或 ACME 证书管理，切换后端时自动停用另一个。
   - icon: 🔒
-    title: 安全可靠
-    details: 敏感信息使用 AES-256-CBC + PBKDF2 加密存储，运行时需密码验证。脚本代码完全开源透明。
-  - icon: 📊
-    title: 专业测评
-    details: 集成融合怪、SuperBench、LemonBench、YABS、UnixBench 等 14 款行业标准测评工具，全面评估服务器性能。
-  - icon: 🖥️
-    title: 桌面环境
-    details: 一行命令在 LXC/Debian 容器中安装 KDE Plasma、GNOME、Xfce、Deepin、MATE 等主流桌面环境。
+    title: 开源透明
+    details: 全部代码在 GitHub 开源，GNU GPL v3 + MIT 双许可，脚本内容可直接审阅，敏感信息加密存储。
 ---
 
-## 平台概览
+## 一行安装
 
-CloudScripts（皮卡在线脚本托管平台）是一个面向 **VPS 和服务器运维人员** 的实用脚本集合平台。它将常见的服务器管理操作整合为可通过一行命令远程执行的脚本，覆盖 **Linux** 和 **Windows** 两大平台。
+::: code-group
 
-### 一键总菜单
-
-```bash
-bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
+```bash [国内线路]
+bash <(curl -fsSL https://pikash.pika.net.cn/Menu.sh)
 ```
 
-> 🌐 **国内加速**：`https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh`
+```bash [海外线路]
+bash <(curl -fsSL https://pikash.opkg.cn/Menu.sh)
+```
 
-Menu.sh 自动检测系统类型（Linux / Windows / macOS），按分类展示所有可用脚本，输入编号即可执行，无需记忆复杂命令。
+:::
 
-### 脚本分类
+两个域名提供完全相同的目录结构，任选其一即可。如果所在网络无法访问某个域名，加 `--mirror` 手动指定另一个：
 
-| 分类 | 平台 | 脚本数量 | 典型用途 |
-|------|------|----------|----------|
-| 服务器部署 | Linux | 1 个交互式脚本 | 一键部署代理、探针、面板、组网、中转服务等 |
-| 性能测评 | Linux | 14 个独立脚本 | CPU/内存/磁盘/网络全面测试 |
-| 系统清理 | Linux | 1 个脚本 | 清理日志、缓存、Docker 无用资源 |
-| 桌面环境 | Linux | 8 个脚本 | LXC 容器中安装各类图形桌面 |
-| 代理面板 | Linux | 3 个脚本 | 3X-UI (Xray-core) 安装/更新 |
-| 容器引擎 | Windows | 3 个脚本 | Docker CE / Nerdctl / Mirantis |
-| 系统激活 | Windows | 1 个脚本 | Windows/Office 激活 |
+```bash
+bash <(curl -fsSL https://pikash.pika.net.cn/Menu.sh) --mirror=https://pikash.opkg.cn
+```
 
-### 为什么选择 CloudScripts
+启动时脚本会并发探测两条线路，取最先响应的一个，并把结果写入 `/var/cache/pika-sh/site.conf`（有效期 24 小时）。线路全部不可达时会给出明确提示，而不是一直等待。详见[镜像通道](/guide/mirror)。
 
-- **零门槛上手**：运行 Menu.sh 或复制一行命令粘贴到终端即可，无需学习复杂的安装步骤
-- **智能选路**：Menu.sh 启动时自动测速，优先直连 GitHub Raw，超时自动切换国内镜像加速
-- **多架构兼容**：自动检测 x86_64 和 ARM64 架构，下载对应二进制文件
-- **开源透明**：全部代码在 [GitHub](https://github.com/PIKACHUIM/CloudScripts) 开源，GNU GPL + MIT 许可证，放心使用
+## 双线路一览
+
+| 域名 | 托管平台 | 推荐场景 |
+|:-----|:---------|:---------|
+| `pikash.pika.net.cn` | 腾讯 EdgeOne Pages | 中国大陆服务器，直连速度快 |
+| `pikash.opkg.cn` | GitHub Pages | 海外服务器、GitHub Actions 等环境 |
+| `raw.githubusercontent.com` | GitHub 源站 | 前两者均不可用时的兜底 |
+
+> 国内与海外服务器互相访问对方线路时经常超时，脚本因此不会固定使用某一个域名，而是每次启动时实测。
+
+## 功能分类
+
+| 分类 | 主要内容 |
+|:-----|:---------|
+| 🖥️ 部署安装 | 换源、面板、探针、Docker/Podman、内网穿透 |
+| 🔧 系统维护 | 内核与 BBR、Swap、防火墙、清理、重装、监控 |
+| 🎨 桌面环境 | Debian LXC 容器内的 8 种图形桌面 |
+| 📊 性能测评 | 融合怪、YABS、UnixBench、IP 质量、路由追踪等 |
+| 🌐 代理组网 | 3X-UI、Clash、Hysteria2、WireGuard、Tailscale 等 |
+| 🛡️ 反向代理 | Caddy / Nginx 二选一，站点与证书统一管理 |
+| 🛠️ 系统工具 | SSH 加固、时区、主机名、自更新、卸载回滚 |
+
+## 文档入口
+
+- [快速开始](/guide/getting-started) — 安装方式、前置要求、常见用法
+- [Linux 脚本](/guide/linux-scripts) — 每个脚本的用途与调用方式
+- [Windows 脚本](/guide/windows-scripts) — Docker、Nerdctl、激活工具
+- [镜像通道](/guide/mirror) — 双线路探测、缓存与自建镜像
+- [故障排除](/guide/troubleshooting) — 下载失败、服务异常等问题排查

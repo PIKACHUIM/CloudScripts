@@ -51,19 +51,38 @@ case "$ARCH" in
     ;;
 esac
 
-# Default CDN base for fetching remote scripts
-: "${PIKA_DESKTOP_CDN:=https://pikash.opkg.cn/Linux/Desktop}"
+# Default CDN base for fetching remote scripts (mainland edge first)
+: "${PIKA_DESKTOP_CDN:=https://pikash.pika.net.cn/Linux/Desktop}"
 
 # Quick helper: fetch and run a desktop script by name
+# Tries both deployments in order, with hard per-attempt timeouts.
 de_run_remote() {
-    local script_name="$1"
-    if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "${PIKA_DESKTOP_CDN}/${script_name}" | bash -e
-    elif command -v wget >/dev/null 2>&1; then
-        wget -qO- "${PIKA_DESKTOP_CDN}/${script_name}" | bash -e
-    else
-        echo "ERROR: curl or wget required" >&2; exit 1
+    local script_name="$1" tmp base rc=0
+    tmp=$(mktemp 2>/dev/null || echo "/tmp/pika-remote-$$.sh")
+
+    for base in "$PIKA_DESKTOP_CDN" \
+                "https://pikash.pika.net.cn/Linux/Desktop" \
+                "https://pikash.opkg.cn/Linux/Desktop" \
+                "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Linux/Desktop"; do
+        if command -v curl >/dev/null 2>&1; then
+            curl -fsSL --connect-timeout 3 --max-time 60 "${base}/${script_name}" -o "$tmp" 2>/dev/null && break
+        elif command -v wget >/dev/null 2>&1; then
+            wget -q -T 60 -t 1 -O "$tmp" "${base}/${script_name}" 2>/dev/null && break
+        else
+            echo "ERROR: curl or wget required" >&2
+            return 1
+        fi
+    done
+
+    if [ ! -s "$tmp" ]; then
+        rm -f "$tmp"
+        echo "ERROR: failed to download ${script_name}" >&2
+        return 1
     fi
+
+    bash -e "$tmp" || rc=$?
+    rm -f "$tmp"
+    return "$rc"
 }
 
 # Standard Desktop pre-check: ensure Server + Graphy are installed before this DE

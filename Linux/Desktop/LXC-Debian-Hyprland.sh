@@ -8,9 +8,23 @@ if [ -f "$(dirname "$0")/commons.sh" ] && [ "$(dirname "$0")" != "." ]; then
     . "$(cd "$(dirname "$0")" && pwd)/commons.sh"
 else
     _tmp_commons=$(mktemp)
-    curl -fsSL "https://pikash.opkg.cn/Linux/Desktop/commons.sh" -o "$_tmp_commons" 2>/dev/null || \
-        wget -qO "$_tmp_commons" "https://pikash.opkg.cn/Linux/Desktop/commons.sh" || \
-        { echo "ERROR: Cannot load commons.sh" >&2; rm -f "$_tmp_commons"; exit 1; }
+    _commons_ok=0
+    # Dual line: mainland edge -> overseas mirror -> raw GitHub, all time-bounded
+    for _base in "https://pikash.pika.net.cn" "https://pikash.opkg.cn" "https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main"; do
+        if curl -fsSL --connect-timeout 3 --max-time 20 "${_base}/Linux/Desktop/commons.sh" -o "$_tmp_commons" 2>/dev/null; then
+            _commons_ok=1
+            break
+        fi
+        if wget -q -T 20 -t 1 -O "$_tmp_commons" "${_base}/Linux/Desktop/commons.sh" 2>/dev/null; then
+            _commons_ok=1
+            break
+        fi
+    done
+    if [ "$_commons_ok" -ne 1 ]; then
+        echo "ERROR: Cannot load commons.sh" >&2
+        rm -f "$_tmp_commons"
+        exit 1
+    fi
     . "$_tmp_commons"
     rm -f "$_tmp_commons"
 fi

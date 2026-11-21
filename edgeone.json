@@ -1,0 +1,6 @@
+{
+  "installCommand": "npm --prefix docs ci",
+  "buildCommand": "node scripts/build-site.mjs",
+  "outputDirectory": "_site",
+  "nodeVersion": "20.18.0"
+}

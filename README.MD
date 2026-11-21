@@ -15,8 +15,8 @@
 
 <p align="center">
   <a href="https://github.com/PIKACHUIM/CloudScripts"><b>📦 项目地址</b></a> &nbsp;|&nbsp;
-  <a href="https://pikash.opkg.cn"><b>📖 文档站点</b></a> &nbsp;|&nbsp;
-  <a href="https://github.524228.xyz/PIKACHUIM/CloudScripts"><b>🚀 国内加速</b></a>
+  <a href="https://pikash.pika.net.cn"><b>📖 文档站点（国内）</b></a> &nbsp;|&nbsp;
+  <a href="https://pikash.opkg.cn"><b>📖 文档站点（海外）</b></a>
 </p>
 
 ---
@@ -27,13 +27,15 @@
 一行命令启动总菜单，自动识别系统并展示对应功能：
 
 ```bash
-bash <(curl -s https://pikash.opkg.cn/Menu.sh)
+# 国内服务器（EdgeOne 线路）
+bash <(curl -fsSL https://pikash.pika.net.cn/Menu.sh)
+
+# 海外服务器（GitHub Pages 线路）
+bash <(curl -fsSL https://pikash.opkg.cn/Menu.sh)
 ```
 
-> 🌐 **GitHub 直连**（备用）：
-> ```bash
-> bash <(curl -s https://ghfile.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
-> ```
+> 🌐 两个域名内容完全一致，脚本启动时会自动探测可用线路；也可用 `--mirror=URL` 强制指定。
+> 每个请求都带连接与总时长上限，线路不可达时几秒内切换，不会卡死。
 
 ### 菜单一览
 
@@ -48,11 +50,11 @@ bash <(curl -s https://pikash.opkg.cn/Menu.sh)
 | 🛡️ **7. 反向代理** | Caddy / Nginx 二选一：一键安装、站点增删、手动或 ACME 证书 |
 | 🛠️ **8. 系统工具** | SSH加固/时区校时/修改主机名/系统信息/自更新/快捷命令/卸载回滚 |
 
-> 中国大陆用户可直接使用，脚本内置**多级镜像自动探测**，无需手动指定加速通道。
+> 国内与海外各有一条独立线路，脚本启动时自动选择可用的那条，无需手动指定加速通道。
 
 ### 新增特性 (v1.0)
 
-- 🌐 **大陆网络加速**：多级镜像通道自动探测，抗 DNS 污染校验，24h 缓存
+- 🌐 **双线路自动选优**：国内 EdgeOne / 海外 GitHub Pages 互为备份，并发探测、24h 缓存，请求全程带超时
 - 🌍 **中英双语**：默认中文，支持 `--lang=en_US` 手动切换
 - 🔧 **统一服务托管**：PM2 优先 > systemd 次选 > nohup 降级，提供统一的启停/日志/卸载接口
 - 📦 **按需加载**：主入口轻量化 (~230行)，业务模块按需下载缓存
@@ -185,13 +187,13 @@ sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
 apt update && apt upgrade
 
 # 2. 基础环境
-curl -s https://pikash.opkg.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
+curl -s https://pikash.pika.net.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
 
 # 3. 图形栈
-curl -s https://pikash.opkg.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
+curl -s https://pikash.pika.net.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
 
 # 4. 选择桌面（示例：Deepin）
-curl -s https://pikash.opkg.cn/Linux/Desktop/LXC-Debian-Deepin.sh | bash -e
+curl -s https://pikash.pika.net.cn/Linux/Desktop/LXC-Debian-Deepin.sh | bash -e
 ```
 
 </details>
@@ -293,13 +295,16 @@ Microsoft Activation Scripts (MAS) AIO v3.10，支持 Windows 和 Office 全系�
 CloudScripts/
 ├── Menu.sh                     # ⭐ 总菜单入口（自动识别系统）
 ├── README.MD                   # 本文档
+├── edgeone.json                # EdgeOne Pages 构建配置
 ├── .github/workflows/          # CI/CD（ShellCheck / Pages 部署）
+├── scripts/
+│   └── build-site.mjs          # 统一构建：VitePress + 脚本镜像 → _site/
 ├── docs/                       # VitePress 文档站点
 │
 ├── Linux/
 │   ├── Lib/                    # 核心库（网络/包管理/UI/i18n/服务托管）
 │   ├── I18n/                   # 中英文语言包
-│   ├── Modules/                # 业务模块（6 大菜单）
+│   ├── Modules/                # 业务模块（7 大菜单）
 │   ├── Desktop/                # Debian LXC 桌面环境（8种）
 │   ├── VPSTest/                # 性能测评（13款工具）
 │   ├── VPSSets/                # VPS 服务器部署
@@ -315,17 +320,37 @@ CloudScripts/
 
 ---
 
+## 🌐 站点部署
+
+站点与脚本镜像来自同一次构建，GitHub Pages 与 EdgeOne Pages 共用 `scripts/build-site.mjs`：
+
+```bash
+npm ci --prefix docs      # 安装 VitePress 依赖
+node scripts/build-site.mjs
+# 产物：_site/  （VitePress 页面 + Menu.sh + Linux/ + WinNT/ + 探针文件）
+```
+
+| 平台 | 触发方式 | 配置 |
+|:-----|:---------|:-----|
+| GitHub Pages (`pikash.opkg.cn`) | 推送 `main` 自动执行 `.github/workflows/pages-deploy.yml` | `CNAME` |
+| EdgeOne Pages (`pikash.pika.net.cn`) | 在 Makers 控制台关联本仓库，推送后自动构建 | `edgeone.json` |
+
+EdgeOne Pages 控制台需设置：安装命令 `npm --prefix docs ci`、构建命令 `node scripts/build-site.mjs`、输出目录 `_site`（`edgeone.json` 已写好，控制台留空即可被覆盖），Node 版本 20。构建完成后在国内线路的自定义域名里绑定 `pikash.pika.net.cn` 即可。
+
+---
+
 ## 🔗 地址说明
 
 | 类型 | 地址 |
 |:-----|:-----|
 | 📦 GitHub | <https://github.com/PIKACHUIM/CloudScripts> |
-| 📖 文档站点 | <https://pikash.opkg.cn> |
-| 🚀 国内加速 | <https://github.524228.xyz/PIKACHUIM/CloudScripts> |
-| 📥 直连 Raw | `https://pikash.opkg.cn` |
+| 📖 文档站点（国内） | <https://pikash.pika.net.cn> |
+| 📖 文档站点（海外） | <https://pikash.opkg.cn> |
+| 📥 脚本直连（国内） | `https://pikash.pika.net.cn` |
+| 📥 脚本直连（海外） | `https://pikash.opkg.cn` |
 | ⚡ 加速 Raw | `https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main` |
 
-> Menu.sh 启动时会自动测速，优先使用直连，超时则自动切换到加速地址。
+> Menu.sh 启动时并发探测两条线路，取最先响应的一个并缓存 24 小时；所有请求带超时上限，线路不可达时数秒内切换。
 
 ---
 

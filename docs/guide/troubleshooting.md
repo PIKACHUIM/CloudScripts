@@ -1,14 +1,36 @@
-# Troubleshooting
+# 故障排除
 
 常见问题及解决方案。
 
-## 下载通道全部不可用
+## 启动后长时间无响应 / 卡住
 
-**症状**：启动时提示"所有代理通道不可用"
+**症状**：执行 `bash <(curl ...)` 后停在 `探测下载线路` 不动，或命令迟迟没有输出
+
+**原因**：所在网络无法访问所选线路（常见于国内服务器访问海外域名），而旧版本请求没有超时上限。
 
 **解决**：
-1. 检查网络连通性：`curl -I https://benchs.pika.net.cn/.pika-healthz`
-2. 清除缓存重试：`rm /var/cache/pika-sh/mirror.conf`
+1. 当前版本所有请求都带超时（连接 2–3 秒、单次最长 15–60 秒），正常情况下数秒内会自动切换线路；若版本较旧，先更新脚本。
+2. 手动指定可达线路：
+   ```bash
+   bash <(curl -fsSL https://pikash.pika.net.cn/Menu.sh) --mirror=https://pikash.pika.net.cn
+   ```
+3. 清除线路缓存后重试：
+   ```bash
+   rm -f /var/cache/pika-sh/site.conf /var/cache/pika-sh/mirror.conf
+   ```
+4. 单独验证线路是否可达（正常应返回含 `PIKA_SH_OK` 的内容）：
+   ```bash
+   curl -fsSL --connect-timeout 3 --max-time 5 https://pikash.pika.net.cn/.pika-healthz
+   curl -fsSL --connect-timeout 3 --max-time 5 https://pikash.opkg.cn/.pika-healthz
+   ```
+
+## 下载通道全部不可用
+
+**症状**：启动时提示"无法连接任何下载线路"或"所有代理通道不可用"
+
+**解决**：
+1. 检查网络连通性：`curl -I https://pikash.pika.net.cn/.pika-healthz`
+2. 清除缓存重试：`rm -f /var/cache/pika-sh/site.conf /var/cache/pika-sh/mirror.conf`
 3. 使用 VPN/代理临时解决
 4. 强制指定可用通道：`bash Menu.sh --mirror=https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main`
 

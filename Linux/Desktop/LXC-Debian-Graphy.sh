@@ -3,8 +3,19 @@
 file="/etc/lxc-de-flag"
 set -e
 if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
-    apt -y install curl && curl https://pikash.opkg.cn/Linux/Desktop/LXC-Debian-Server.sh | bash -e
-	apt -y install curl && curl https://pikash.opkg.cn/Linux/Desktop/LXC-Debian-Graphy.sh | bash -e
+    apt -y install curl
+    # Dual line fetch: mainland edge first, overseas mirror as fallback
+    _pika_get() {
+        local rel="$1" out="$2" base
+        for base in "https://pikash.pika.net.cn" "https://pikash.opkg.cn"; do
+            if curl -fsSL --connect-timeout 3 --max-time 40 "${base}/${rel}" -o "$out" 2>/dev/null; then
+                return 0
+            fi
+        done
+        return 1
+    }
+    _pika_get "Linux/Desktop/LXC-Debian-Server.sh" /tmp/pika-lxc-server.sh && bash -e /tmp/pika-lxc-server.sh
+    _pika_get "Linux/Desktop/LXC-Debian-Graphy.sh" /tmp/pika-lxc-graphy.sh && bash -e /tmp/pika-lxc-graphy.sh
 else
     read -r content < "$file"      # 去掉前后空白，只读第一行
     case "$content" in

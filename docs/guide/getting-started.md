@@ -7,12 +7,16 @@
 CloudScripts 提供了统一的 `Menu.sh` 总菜单脚本，**自动识别系统类型**并展示对应功能。你只需要：
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
+# 国内服务器（EdgeOne 线路）
+bash <(curl -fsSL https://pikash.pika.net.cn/Menu.sh)
+
+# 海外服务器（GitHub Pages 线路）
+bash <(curl -fsSL https://pikash.opkg.cn/Menu.sh)
 ```
 
-> 🌐 **国内加速**（下载更快）：
+> 🌐 **两条线路内容完全一致**，任选其一即可。脚本启动时也会自动探测当前可用的线路；若所在网络无法访问所选域名，用 `--mirror` 指定另一个：
 > ```bash
-> bash <(curl -s https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)
+> bash <(curl -fsSL https://pikash.pika.net.cn/Menu.sh) --mirror=https://pikash.opkg.cn
 > ```
 
 启动后你会看到分类清晰的菜单，输入编号即可执行对应脚本：
@@ -34,14 +38,14 @@ bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Men
 ### Linux 执行方式
 
 ```bash
-# 使用 curl
-bash <(curl -sSL https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/脚本路径)
+# 国内线路
+bash <(curl -fsSL https://pikash.pika.net.cn/脚本路径)
 
-# 使用 wget
-bash <(wget -qO- https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/脚本路径)
+# 海外线路
+bash <(curl -fsSL https://pikash.opkg.cn/脚本路径)
 
-# 国内加速（将 raw.githubusercontent.com 替换为镜像前缀）
-bash <(curl -sSL https://github.524228.xyz/https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/脚本路径)
+# 使用 wget（线路同上，任选其一）
+bash <(wget -qO- https://pikash.pika.net.cn/脚本路径)
 ```
 
 ### Windows 执行方式
@@ -49,8 +53,10 @@ bash <(curl -sSL https://github.524228.xyz/https://raw.githubusercontent.com/PIK
 在 **PowerShell（管理员模式）** 中执行：
 
 ```powershell
-irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/脚本路径 | iex
+irm https://pikash.pika.net.cn/WinNT/脚本路径 | iex
 ```
+
+> 海外机器可将域名换成 `pikash.opkg.cn`；上游源站 `raw.githubusercontent.com/PIKACHUIM/CloudScripts/main` 同样可用。
 
 ## 前置要求
 
@@ -58,7 +64,7 @@ irm https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/WinNT/脚本�
 
 - **操作系统**：Debian 9+ / Ubuntu 18.04+ / CentOS 7+ / Rocky Linux / AlmaLinux
 - **权限**：建议使用 `root` 用户或具有 `sudo` 权限的用户
-- **网络**：能够访问外网（脚本托管在 GitHub Raw 上）
+- **网络**：能够访问 `pikash.pika.net.cn` 或 `pikash.opkg.cn` 之一（国内机器选前者，海外机器选后者）
 - **依赖**：系统需预装 `curl` 或 `wget`（绝大多数发行版默认包含）
 
 ### Windows 环境
