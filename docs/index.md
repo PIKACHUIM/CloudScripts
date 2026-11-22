@@ -33,8 +33,8 @@ features:
     title: Linux 全覆盖
     details: 部署、维护、桌面环境、性能测评、代理组网、反向代理六大类，覆盖 Debian/Ubuntu/RHEL/Alpine 等主流发行版。
   - icon: 🛡️
-    title: 反向代理二选一
-    details: Caddy 与 Nginx 任选其一，一键安装、站点增删、手动或 ACME 证书管理，切换后端时自动停用另一个。
+    title: 反向代理统一管理
+    details: Caddy 与 Nginx 共用一套站点菜单（增删改、启停、连通性测试、证书、服务），进入即按当前引擎展开，不再先问选哪个。
   - icon: 🔒
     title: 开源透明
     details: 全部代码在 GitHub 开源，GNU GPL v3 + MIT 双许可，脚本内容可直接审阅，敏感信息加密存储。
@@ -82,7 +82,7 @@ bash <(curl -fsSL https://pikash.pika.net.cn/Menu.sh) --mirror=https://pikash.op
 | 📊 性能测评 | 融合怪、YABS、UnixBench、IP 质量、路由追踪等 |
 | 📦 软件安装 | 网络穿透、面板监控、建站媒体、存储协作、账号安全、AI 开发、阅读工具 |
 | 🌐 代理组网 | 3X-UI、Clash、Hysteria2、WireGuard、Tailscale 等 |
-| 🛡️ 反向代理 | Caddy / Nginx 二选一，站点与证书统一管理 |
+| 🛡️ 反向代理 | Caddy / Nginx 统一站点菜单：增删改、启停、连通性测试、证书与服务 |
 | 🛠️ 系统工具 | SSH 加固、时区、主机名、自更新、卸载回滚 |
 
 ## 文档入口

@@ -294,6 +294,28 @@ _pika_download_to() {
     return 1
 }
 
+# Probe one URL, print the HTTP status code ("000" on failure).
+# Optional host/port resolve the name to 127.0.0.1, so a site can be tested
+# locally before DNS or the firewall is in place.
+pika_http_probe() {
+    local url="$1" host="${2:-}" port="${3:-}" code=""
+    if ! command -v curl >/dev/null 2>&1; then
+        printf '000'
+        return 1
+    fi
+    if [ -n "$host" ] && [ -n "$port" ]; then
+        code=$(curl -sk -o /dev/null -w '%{http_code}' \
+            --connect-timeout 3 --max-time 8 \
+            --resolve "${host}:${port}:127.0.0.1" "$url" 2>/dev/null || true)
+    else
+        code=$(curl -sk -o /dev/null -w '%{http_code}' \
+            --connect-timeout 3 --max-time 8 "$url" 2>/dev/null || true)
+    fi
+    [ -n "$code" ] || code=000
+    printf '%s' "$code"
+    [ "$code" != "000" ]
+}
+
 # ============================================================
 #  Unified download: pika_fetch
 #  Usage:

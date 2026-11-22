@@ -452,26 +452,36 @@ _caddy_collect_sites() {
     [ ${#CADDY_SITE_IDS[@]} -gt 0 ]
 }
 
+# ---- 站点是否启用（meta 里没有 enabled 字段 = 启用） ----
+_caddy_site_enabled() {
+    local v
+    v=$(_caddy_meta_get "$1" "enabled" 2>/dev/null || true)
+    [ "${v:-1}" != "0" ]
+}
+
 _caddy_print_sites() {
     if ! _caddy_collect_sites; then
         pika_info "$(t 'caddy.site.none')"
         return 1
     fi
-    printf '\n  %-4s %s %s %s %s\n' \
+    printf '\n  %-4s %s %s %s %s %s\n' \
         "#" \
         "$(_ui_str_pad "$(t 'caddy.site.domains')" 26)" \
         "$(_ui_str_pad "$(t 'caddy.site.upstream')" 26)" \
         "$(_ui_str_pad "$(t 'caddy.site.tls')" 10)" \
+        "$(_ui_str_pad "$(t 'rp.state')" 6)" \
         "$(t 'site.port')"
-    local i=1 id d u m p
+    local i=1 id d u m p st
     for id in "${CADDY_SITE_IDS[@]}"; do
         d=$(_caddy_meta_get "$id" "domains" 2>/dev/null || true)
         u=$(_caddy_meta_get "$id" "upstreams" 2>/dev/null || true)
         m=$(_caddy_meta_get "$id" "tls_mode" 2>/dev/null || true)
         p=$(_caddy_meta_get "$id" "port" 2>/dev/null || true)
-        printf '  %-4s %s %s %s %s\n' \
+        if _caddy_site_enabled "$id"; then st=$(t 'rp.state.on'); else st=$(t 'rp.state.off'); fi
+        printf '  %-4s %s %s %s %s %s\n' \
             "[$i]" "$(_ui_str_pad "$d" 26)" "$(_ui_str_pad "$u" 26)" \
-            "$(_ui_str_pad "${m:-auto}" 10)" "${p:-$(t 'site.port.default')}"
+            "$(_ui_str_pad "${m:-auto}" 10)" "$(_ui_str_pad "$st" 6)" \
+            "${p:-$(t 'site.port.default')}"
         i=$((i + 1))
     done
     return 0
@@ -495,7 +505,13 @@ _caddy_pick_site() {
 # ============================================================
 _caddy_render_site() {
     local id="$1"
-    local domains upstreams tls_mode cert key extra port addrs upstream_list d u host
+    local domains upstreams tls_mode cert key extra port addrs upstream_list d u host enabled
+    # A disabled site keeps its metadata but renders no Caddyfile fragment.
+    enabled=$(_caddy_meta_get "$id" "enabled" 2>/dev/null || true)
+    if [ "${enabled:-1}" = "0" ]; then
+        rm -f "$(_caddy_site_path "$id")"
+        return 0
+    fi
     domains=$(_caddy_meta_get "$id" "domains" 2>/dev/null || true)
     upstreams=$(_caddy_meta_get "$id" "upstreams" 2>/dev/null || true)
     tls_mode=$(_caddy_meta_get "$id" "tls_mode" 2>/dev/null || true)
@@ -850,6 +866,62 @@ do_caddy_site_del() {
     rm -f "$(_caddy_site_path "$id")" "$(_caddy_meta_path "$id")"
     pika_info "$(t 'caddy.site.deleted'): $id"
     _caddy_apply || true
+    return 0
+}
+
+# ---- 启用 / 停用：保留配置，只是不参与渲染与重载 ----
+do_caddy_site_toggle() {
+    _caddy_require || return 1
+    _caddy_collect_sites || { pika_info "$(t 'caddy.site.none')"; return 0; }
+
+    local id d
+    id=$(_caddy_pick_site) || { pika_info "$(t 'ui.cancelled')"; return 0; }
+    d=$(_caddy_meta_get "$id" "domains" 2>/dev/null || true)
+
+    if _caddy_site_enabled "$id"; then
+        _caddy_meta_set "$id" "enabled" "0"
+        rm -f "$(_caddy_site_path "$id")"
+        pika_info "$(t 'rp.site.disabled' "$d")"
+    else
+        _caddy_meta_set "$id" "enabled" "1"
+        _caddy_render_site "$id"
+        pika_info "$(t 'rp.site.enabled' "$d")"
+    fi
+    _caddy_apply || return 1
+    return 0
+}
+
+# ---- 连通性测试：先测上游，再从本机按域名回环测站点 ----
+do_caddy_site_test() {
+    _caddy_require || return 1
+    _caddy_collect_sites || { pika_info "$(t 'caddy.site.none')"; return 0; }
+
+    local id d u port host up scheme lport tls_mode code
+    id=$(_caddy_pick_site) || { pika_info "$(t 'ui.cancelled')"; return 0; }
+    d=$(_caddy_meta_get "$id" "domains" 2>/dev/null || true)
+    u=$(_caddy_meta_get "$id" "upstreams" 2>/dev/null || true)
+    port=$(_caddy_meta_get "$id" "port" 2>/dev/null || true)
+    tls_mode=$(_caddy_meta_get "$id" "tls_mode" 2>/dev/null || true)
+    host=${d%%,*}
+    up=${u%%,*}
+
+    printf '\n  %s: %s\n' "$(t 'caddy.site.domains')" "$d"
+    printf '  %s: %s\n\n' "$(t 'caddy.site.upstream')" "$u"
+
+    if [ -n "$up" ]; then
+        code=$(pika_http_probe "$up" 2>/dev/null || true)
+        printf '  %s\n' "$(t 'rp.test.upstream' "$up" "${code:-000}")"
+    fi
+
+    if [ -n "$host" ]; then
+        if [ "${tls_mode:-auto}" = "off" ]; then scheme="http"; else scheme="https"; fi
+        lport="${port:-}"
+        if [ -z "$lport" ]; then
+            if [ "$scheme" = "https" ]; then lport=443; else lport=80; fi
+        fi
+        code=$(pika_http_probe "${scheme}://${host}:${lport}/" "$host" "$lport" 2>/dev/null || true)
+        printf '  %s\n' "$(t 'rp.test.site' "$host" "${code:-000}")"
+    fi
     return 0
 }
 

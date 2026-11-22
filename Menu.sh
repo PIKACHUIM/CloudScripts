@@ -20,7 +20,7 @@ if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ] || { [ "${BASH_VERSINFO[0]:-0}" -eq 4 ] &&
     exit 1
 fi
 
-PIKA_VERSION="1.3"
+PIKA_VERSION="1.4"
 PIKA_BASE="$(cd "$(dirname "$0")" && pwd)"
 PIKA_LIB_DIR="${PIKA_BASE}/Linux/Lib"
 PIKA_MOD_DIR="${PIKA_BASE}/Linux/Modules"
@@ -34,6 +34,17 @@ PIKA_NO_ACCEL=0
 PIKA_DIRECT_CAT=""
 PIKA_DIRECT_ITEM=""
 
+# ---- Short fingerprint for --doctor (works before any library is loaded) ----
+_pika_fingerprint() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" 2>/dev/null | cut -c1-12
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" 2>/dev/null | cut -c1-12
+    else
+        printf '?'
+    fi
+}
+
 while [ $# -gt 0 ]; do
     case "$1" in
         --lang=*)    PIKA_LANG="${1#*=}"; shift ;;
@@ -42,6 +53,33 @@ while [ $# -gt 0 ]; do
         --no-accel)  PIKA_NO_ACCEL=1; shift ;;
         --accel)     PIKA_NO_ACCEL=0; shift ;;
         --yes|-y)    PIKA_YES=1; shift ;;
+        --version|-v)
+            echo "PIKA SH v${PIKA_VERSION}"
+            exit 0
+            ;;
+        --doctor)
+            # 报告“这台机器上实际会跑哪份代码”，用于排查版本漂移。
+            echo "PIKA SH v${PIKA_VERSION}"
+            echo "entry: ${PIKA_BASE}/Menu.sh"
+            for _f in Menu.sh Linux/Lib/00-core.sh Linux/Lib/40-ui.sh Linux/Lib/50-i18n.sh \
+                      Linux/I18n/zh_CN.sh Linux/Modules/reverseproxy.sh \
+                      Linux/Modules/caddy.sh Linux/Modules/nginx.sh; do
+                if [ -f "${PIKA_BASE}/${_f}" ]; then
+                    printf '  %-34s %s\n' "$_f" "$(_pika_fingerprint "${PIKA_BASE}/${_f}")"
+                else
+                    printf '  %-34s %s\n' "$_f" "(not on disk - fetched on demand)"
+                fi
+            done
+            _cache="${PIKA_CACHE_DIR:-/var/cache/pika-sh}/modules"
+            if [ -d "$_cache" ]; then
+                echo "cache: $_cache"
+                for _f in "$_cache"/*.sh; do
+                    [ -f "$_f" ] || continue
+                    printf '  %-34s %s\n' "${_f##*/}" "$(_pika_fingerprint "$_f")"
+                done
+            fi
+            exit 0
+            ;;
         --help|-h)
             echo "PIKA SH v${PIKA_VERSION}"
             echo "Usage: bash Menu.sh [category] [item] [options]"
@@ -446,7 +484,7 @@ menu_proxy() {
 
 menu_reverseproxy() {
     _load_module "reverseproxy.sh" || return
-    _menu_loop "reverseproxy" "ReverseProxyMENU" "menu.reverseproxy"
+    do_rp_enter
 }
 
 menu_system() {
@@ -515,9 +553,16 @@ PIKA_LAUNCHER
 }
 
 # ---- Generic menu loop ----
+# $3 is an i18n key, unless $4 = 1, in which case it is the title itself.
 _menu_loop() {
-    local arr_name="$2" title_key="$3"
+    local arr_name="$2" title_key="$3" literal="${4:-0}"
     local -n items="$arr_name"
+    local title
+    if [ "$literal" = "1" ]; then
+        title="$title_key"
+    else
+        title="$(t "$title_key")"
+    fi
 
     while true; do
         # Keep the previous output (logs, errors) on screen when asked to.
@@ -528,7 +573,7 @@ _menu_loop() {
             ui_header
         fi
         PIKA_KEEP_SCREEN=0
-        ui_menu "$(t "$title_key")" "$arr_name" "$(t 'menu.back')"
+        ui_menu "$title" "$arr_name" "$(t 'menu.back')"
         read -r sel || return 0
 
         # Back: 0, b/back, q/quit
