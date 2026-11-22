@@ -357,23 +357,107 @@ ui_pause() {
 
 # 粘贴证书链时会多读一行，留给下一次 ui_read_pem 用，避免吞掉私钥首行
 UI_PEM_PUSHBACK=""
+# 允许测试或特殊环境指定编辑器，例如 UI_PEM_EDITOR_CMD=/tmp/fake-editor.sh
+UI_PEM_EDITOR_CMD="${UI_PEM_EDITOR_CMD:-}"
+
+# 找一个能用的编辑器：UI_PEM_EDITOR_CMD > $EDITOR > $VISUAL > nano > vim > vi
+_ui_pem_editor_pick() {
+    local e
+    for e in "${UI_PEM_EDITOR_CMD:-}" "${EDITOR:-}" "${VISUAL:-}" nano vim vi; do
+        [ -n "$e" ] || continue
+        command -v "${e%% *}" >/dev/null 2>&1 || continue
+        printf '%s\n' "$e"
+        return 0
+    done
+    return 1
+}
+
+# 去掉 CR、行尾空白与首尾空行：编辑器保存出来的文件直接可用
+_ui_pem_normalize() {
+    local f="$1" tmp="${f}.pika.$$"
+    sed -e 's/\r$//' -e 's/[[:space:]]*$//' "$f" 2>/dev/null \
+        | awk 'BEGIN{seen=0} /^[[:space:]]*$/{ if(seen) buf[++n]=$0; next }
+               { for(i=1;i<=n;i++) print buf[i]; n=0; print; seen=1 }' > "$tmp" \
+        && mv -f "$tmp" "$f"
+    rm -f "$tmp" 2>/dev/null || true
+    return 0
+}
+
+# 终端开启 bracketed paste 时，粘贴内容首尾会带 ESC[200~ / ESC[201~，
+# 不剥掉的话首行就不是 -----BEGIN 开头，会被当成文件路径。
+_ui_pem_clean() {
+    local s="$1"
+    s="${s//$'\033[200~'/}"
+    s="${s//$'\033[201~'/}"
+    s="${s//$'\033[200'/}"
+    s="${s//$'\033[201'/}"
+    printf '%s' "$s"
+}
+
+# 内容里要有完整的 BEGIN...END 块（私钥/证书都适用）
+_ui_pem_block_ok() {
+    local f="$1" endmark="$2"
+    [ -s "$f" ] || return 1
+    grep -q -- '-----BEGIN ' "$f" 2>/dev/null || return 1
+    grep -q -- "$endmark" "$f" 2>/dev/null || return 1
+    return 0
+}
+
+# 打开编辑器粘贴。失败时自己打印原因，返回 1 让主循环重新提问。
+# 每次只开一次编辑器：内容不合格就交回主循环，由用户决定重按回车还是改粘贴。
+_ui_pem_edit_flow() {
+    local out="$1" endmark="$2" cmd base
+    local -a ec
+    # 没有终端就没法全屏编辑；显式给了 UI_PEM_EDITOR_CMD 时放行（测试用）
+    if [ ! -t 0 ] && [ -z "${UI_PEM_EDITOR_CMD:-}" ]; then
+        printf '  %s\n' "$(t 'ui.pem.no_tty')"
+        return 1
+    fi
+    cmd=$(_ui_pem_editor_pick) || { printf '  %s\n' "$(t 'ui.pem.no_editor')"; return 1; }
+    IFS=' ' read -r -a ec <<< "$cmd"
+    base=$(basename "${ec[0]}")
+
+    printf '\n  %s\n' "$(t 'ui.pem.editor_open')"
+    case "$base" in
+        nano|pico) printf '  %s\n' "$(t 'ui.pem.editor_keys_nano')" ;;
+        vi|vim|nvim) printf '  %s\n' "$(t 'ui.pem.editor_keys_vi')" ;;
+    esac
+
+    : > "$out" 2>/dev/null || return 1
+    case "$base" in
+        nano|pico) "${ec[@]}" -w "$out" ;;
+        *) "${ec[@]}" "$out" ;;
+    esac
+    printf '\n'
+    _ui_pem_normalize "$out"
+
+    _ui_pem_block_ok "$out" "$endmark" && return 0
+    if [ -s "$out" ]; then
+        printf '  %s\n' "$(t 'ui.pem.editor_bad')"
+    else
+        printf '  %s\n' "$(t 'ui.pem.editor_empty')"
+    fi
+    return 1
+}
 
 # ============================================================
-#  Read a PEM block: accept a file path or pasted content
+#  Read a PEM block: editor paste (default) / file path / paste
 #  Usage: ui_read_pem <prompt> <out_file> <end_marker>
 #  Returns: 0 = written, 2 = path not found, 3 = pasted block
 #           incomplete, 1 = empty / cancelled
-#  Pasted input starts with "-----BEGIN" and is copied verbatim up to
+#  Enter alone opens $EDITOR (nano/vim) on the target file: this is
+#  the only reliable way to take a multi-line private key, because a
+#  terminal may deliver a paste as a single buffered line.
+#  Pasted input starting with "-----BEGIN" is copied verbatim up to
 #  the matching END line; on a terminal a following CERTIFICATE block
-#  (fullchain) is appended too, and any other lookahead line is pushed
+#  (fullchain) is appended, and any other lookahead line is pushed
 #  back so the next prompt can use it.
 #  UI_PEM_INPUT keeps the raw first line so callers can echo it back.
 # ============================================================
 ui_read_pem() {
-    local prompt="$1" out="$2" endmark="$3" line peek ended=0 tries=0
+    local prompt="$1" out="$2" endmark="$3" line peek ended=0 tries=0 retry=0
     UI_PEM_INPUT=""
 
-    # 空行不当成取消：提示一句继续等，最多三次（Ctrl-D / EOF 才算取消）
     while :; do
         if [ -n "${UI_PEM_PUSHBACK:-}" ]; then
             line="$UI_PEM_PUSHBACK"
@@ -382,58 +466,75 @@ ui_read_pem() {
             printf '  %s: ' "$prompt"
             IFS= read -r line || return 1
         fi
+        line=$(_ui_pem_clean "$line")
         line=${line%$'\r'}
         # 去掉首尾空白，以及从别处粘贴时带上的双引号
         line="${line#"${line%%[![:space:]]*}"}"
         line="${line%"${line##*[![:space:]]}"}"
         line="${line%\"}"; line="${line#\"}"
-        [ -n "$line" ] && break
-        tries=$((tries + 1))
-        [ "$tries" -ge 3 ] && return 1
-        printf '  %s\n' "$(t 'ui.pem.empty')"
-    done
-    UI_PEM_INPUT="$line"
 
-    case "$line" in
-        "-----BEGIN"*)
-            : > "$out" || return 1
-            printf '%s\n' "$line" >> "$out"
-            while IFS= read -r line; do
-                line=${line%$'\r'}
+        if [ -z "$line" ]; then
+            # 直接回车 = 打开编辑器粘贴，失败时流程内已说明原因
+            _ui_pem_edit_flow "$out" "$endmark" && return 0
+            tries=$((tries + 1))
+            [ "$tries" -ge 3 ] && return 1
+            continue
+        fi
+        UI_PEM_INPUT="$line"
+
+        case "$line" in
+            "-----BEGIN"*)
+                : > "$out" || return 1
                 printf '%s\n' "$line" >> "$out"
-                case "$line" in
-                    *"$endmark"*) ended=1; break ;;
-                esac
-            done
-            [ "$ended" -eq 1 ] || return 3
-            # 终端里继续读证书链；管道输入不 peek，避免吞掉后续回答
-            while [ -t 0 ]; do
-                IFS= read -r -t 2 peek || break
-                peek=${peek%$'\r'}
-                case "$peek" in
-                    "-----BEGIN CERTIFICATE"*)
-                        printf '%s\n' "$peek" >> "$out"
-                        while IFS= read -r line; do
-                            line=${line%$'\r'}
-                            printf '%s\n' "$line" >> "$out"
-                            case "$line" in *"$endmark"*) break ;; esac
-                        done
-                        ;;
-                    *)
-                        # 不是下一段证书：留给下一个输入框
-                        UI_PEM_PUSHBACK="$peek"
-                        break
-                        ;;
-                esac
-            done
-            return 0
-            ;;
-        *)
-            [ -f "$line" ] || return 2
-            cp -f "$line" "$out" || return 1
-            ;;
-    esac
-    return 0
+                while IFS= read -r line; do
+                    line=$(_ui_pem_clean "$line")
+                    line=${line%$'\r'}
+                    printf '%s\n' "$line" >> "$out"
+                    case "$line" in
+                        *"$endmark"*) ended=1; break ;;
+                    esac
+                done
+                if [ "$ended" -ne 1 ]; then
+                    # 终端里给一次改用编辑器的机会，别让用户卡在粘贴上
+                    retry=$((retry + 1))
+                    printf '  %s\n' "$(t 'ui.pem.incomplete')"
+                    if [ -t 0 ] && [ "$retry" -le 2 ]; then
+                        printf '  %s\n' "$(t 'ui.pem.retry_editor')"
+                        continue
+                    fi
+                    return 3
+                fi
+                # 终端里继续读证书链；管道输入不 peek，避免吞掉后续回答
+                while [ -t 0 ]; do
+                    IFS= read -r -t 2 peek || break
+                    peek=$(_ui_pem_clean "$peek")
+                    peek=${peek%$'\r'}
+                    case "$peek" in
+                        "-----BEGIN CERTIFICATE"*)
+                            printf '%s\n' "$peek" >> "$out"
+                            while IFS= read -r line; do
+                                line=${line%$'\r'}
+                                printf '%s\n' "$line" >> "$out"
+                                case "$line" in *"$endmark"*) break ;; esac
+                            done
+                            ;;
+                        *)
+                            # 不是下一段证书：留给下一个输入框
+                            UI_PEM_PUSHBACK="$peek"
+                            break
+                            ;;
+                    esac
+                done
+                return 0
+                ;;
+            *)
+                [ -f "$line" ] || return 2
+                cp -f "$line" "$out" || return 1
+                _ui_pem_normalize "$out"
+                return 0
+                ;;
+        esac
+    done
 }
 
 # ============================================================
