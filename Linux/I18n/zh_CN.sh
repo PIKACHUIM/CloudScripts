@@ -366,6 +366,7 @@ T_proxy_wgeasy_password="密码"
 
 T_common_done="完成"
 T_common_error="错误"
+T_common_mirror_stale="镜像正在更新，部分菜单名称可能显示异常，请稍后重试"
 T_common_cancel="取消"
 
 # ---- Caddy ----

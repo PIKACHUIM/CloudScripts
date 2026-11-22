@@ -366,6 +366,7 @@ T_proxy_wgeasy_password="Password"
 
 T_common_done="Done"
 T_common_error="Error"
+T_common_mirror_stale="Mirror is updating; some menu labels may look wrong - retry shortly"
 T_common_cancel="Cancel"
 
 # ---- Caddy ----

@@ -322,7 +322,7 @@ ui_menu() {
 
     ui_divider "$((row_w - 2))"
     ui_section "$title"
-    local idx=1
+    local idx=1 entry key title_key desc_key handler
     for entry in "${entries[@]}"; do
         IFS='|' read -r key title_key desc_key handler <<< "$entry"
         ui_item "$idx" "$(t "$title_key")" "$(t "$desc_key")"

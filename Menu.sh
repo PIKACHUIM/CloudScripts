@@ -20,7 +20,7 @@ if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ] || { [ "${BASH_VERSINFO[0]:-0}" -eq 4 ] &&
     exit 1
 fi
 
-PIKA_VERSION="1.2"
+PIKA_VERSION="1.3"
 PIKA_BASE="$(cd "$(dirname "$0")" && pwd)"
 PIKA_LIB_DIR="${PIKA_BASE}/Linux/Lib"
 PIKA_MOD_DIR="${PIKA_BASE}/Linux/Modules"
@@ -303,6 +303,33 @@ _load_lib() {
 }
 
 # ---- Module loader (lazy, caches to /var/cache/pika-sh/modules) ----
+# A module is only accepted when every i18n key it references resolves against the
+# language pack that is already loaded. A mirror that is half-way through a release
+# (new pack uploaded, old module still cached) would otherwise render raw keys such
+# as "deploy.frps.desc", so such a copy is skipped in favour of the next source.
+_pika_module_missing_keys() {
+    local f="$1" k v out=""
+    local keys
+    keys=$(
+        { grep -oE '"[a-z0-9_]+\|[A-Za-z0-9_.]+\|[A-Za-z0-9_.]+\|' "$f" 2>/dev/null \
+              | tr '|' '\n' | grep -E '^[a-z][A-Za-z0-9_]*\.[A-Za-z0-9_.]+$'
+          grep -oE "\bt ['\"][A-Za-z0-9_.]+['\"]" "$f" 2>/dev/null \
+              | sed -E "s/^t ['\"]//; s/['\"]\$//"
+        } | sort -u
+    )
+    while IFS= read -r k; do
+        [ -n "$k" ] || continue
+        v="T_${k//./_}"
+        [ -n "${!v:-}" ] || out="${out}${k} "
+    done <<< "$keys"
+    printf '%s' "$out"
+}
+
+_pika_get() {  # url outfile
+    curl -fsSL --connect-timeout 3 --max-time 25 "$1" -o "$2" 2>/dev/null || \
+        wget -q -T 25 -t 1 -O "$2" "$1" 2>/dev/null
+}
+
 _load_module() {
     local mod="$1"
     local cache_dir="${PIKA_CACHE_DIR}/modules"
@@ -317,62 +344,56 @@ _load_module() {
 
     local cached="${cache_dir}/${mod}"
     local tmpf="${cached}.tmp"
+    local keep="${cached}.keep"
+    rm -f "$tmpf" "$keep" "$cached"
 
-    # Fetch a module and verify it parses BEFORE using it. A stale/broken
-    # source (e.g. CDN not yet redeployed) is rejected and we fall back to the
-    # other source, instead of sourcing a file with a syntax error.
-    _pika_fetch_checked() {
-        local url="$1" out="$2"
-        if curl -fsSL --connect-timeout 3 --max-time 25 "$url" -o "$out" 2>/dev/null || \
-           wget -q -T 25 -t 1 -O "$out" "$url" 2>/dev/null; then
-            if bash -n "$out" 2>/dev/null; then
-                return 0
-            fi
-        fi
-        return 1
-    }
-
-    # 1) Preferred mirror (already resolved during bootstrap)
-    rm -f "${cache_dir}/${mod}"
-    if pika_fetch "Linux/Modules/${mod}" -o "$tmpf" 2>/dev/null && bash -n "$tmpf" 2>/dev/null; then
-        mv -f "$tmpf" "$cached"
-        . "$cached"
-        return
-    fi
-    rm -f "$tmpf"
-
-    # 2) The other site (mainland <-> overseas), covers a single-line outage
-    local other_site="$PIKA_SITE_INTL"
-    case "$PIKA_SITE_BASE" in
-        *pikash.pika.net.cn*) other_site="$PIKA_SITE_INTL" ;;
-        *pikash.opkg.cn*)     other_site="$PIKA_SITE_CN" ;;
-    esac
-    if _pika_fetch_checked "${other_site}/Linux/Modules/${mod}" "$tmpf"; then
-        mv -f "$tmpf" "$cached"
-        . "$cached"
-        return
-    fi
-    rm -f "$tmpf"
-
-    # 3) Last resort: live GitHub source (always reflects current repo HEAD)
-    if _pika_fetch_checked "${PIKA_SITE_RAW}/Linux/Modules/${mod}" "$tmpf"; then
-        mv -f "$tmpf" "$cached"
-        . "$cached"
-        return
-    fi
-    rm -f "$tmpf"
-
-    # 4) GitHub blocked: fetch through an accelerator prefix
-    local gh_prefix
+    # Every source that can serve this module, in preference order.
+    local -a sources=()
+    [ -n "${PIKA_SITE_BASE:-}" ] && sources+=("$PIKA_SITE_BASE")
+    [ -n "${PIKA_SITE_CN:-}" ] && [ "$PIKA_SITE_CN" != "${PIKA_SITE_BASE:-}" ] && sources+=("$PIKA_SITE_CN")
+    [ -n "${PIKA_SITE_INTL:-}" ] && [ "$PIKA_SITE_INTL" != "${PIKA_SITE_BASE:-}" ] && sources+=("$PIKA_SITE_INTL")
+    [ -n "${PIKA_SITE_RAW:-}" ] && sources+=("$PIKA_SITE_RAW")
     if [ "${PIKA_NO_ACCEL:-0}" != "1" ]; then
-        for gh_prefix in "${PIKA_GH_FALLBACK_PREFIXES[@]}"; do
-            if _pika_fetch_checked "${gh_prefix}${PIKA_SITE_RAW}/Linux/Modules/${mod}" "$tmpf"; then
-                mv -f "$tmpf" "$cached"
-                . "$cached"
-                return
-            fi
-            rm -f "$tmpf"
+        local gh_prefix
+        for gh_prefix in "${PIKA_GH_FALLBACK_PREFIXES[@]:-}"; do
+            [ -n "$gh_prefix" ] && sources+=("${gh_prefix}${PIKA_SITE_RAW}")
         done
+    fi
+
+    local src missing best=""
+    for src in "${sources[@]}"; do
+        if ! _pika_get "${src}/Linux/Modules/${mod}" "$tmpf"; then
+            rm -f "$tmpf"
+            continue
+        fi
+        if ! bash -n "$tmpf" 2>/dev/null; then
+            pika_debug "module ${mod}: syntax error from ${src}, skipping"
+            rm -f "$tmpf"
+            continue
+        fi
+        missing=$(_pika_module_missing_keys "$tmpf")
+        if [ -z "$missing" ]; then
+            mv -f "$tmpf" "$cached"
+            . "$cached"
+            return
+        fi
+        pika_debug "module ${mod}: ${src} is out of sync (missing: ${missing})"
+        if [ -z "$best" ]; then
+            mv -f "$tmpf" "$keep"
+            best="$keep"
+        else
+            rm -f "$tmpf"
+        fi
+    done
+
+    # Nothing agreed with the language pack: use the first parsable copy so the
+    # menu still works, and say why the labels look odd.
+    if [ -n "$best" ]; then
+        pika_warn "$(t 'common.mirror_stale')"
+        PIKA_KEEP_SCREEN=1
+        mv -f "$best" "$cached"
+        . "$cached"
+        return
     fi
 
     pika_err "$(t 'common.error'): module $mod"
