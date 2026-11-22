@@ -20,7 +20,7 @@ if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ] || { [ "${BASH_VERSINFO[0]:-0}" -eq 4 ] &&
     exit 1
 fi
 
-PIKA_VERSION="1.6"
+PIKA_VERSION="1.7"
 PIKA_BASE="$(cd "$(dirname "$0")" && pwd)"
 PIKA_LIB_DIR="${PIKA_BASE}/Linux/Lib"
 PIKA_MOD_DIR="${PIKA_BASE}/Linux/Modules"
@@ -638,6 +638,7 @@ _menu_loop() {
         fi
 
         local rc=0
+        UI_MENU_RENDERED=0
         ui_dispatch "$arr_name" "$sel" || rc=$?
         if [ "$rc" -eq 2 ]; then return 0; fi
         if [ "$rc" -ne 0 ]; then
@@ -646,11 +647,11 @@ _menu_loop() {
             continue
         fi
 
-        # Only pause when the action failed and needs attention.
-        if [ "${PIKA_DISPATCH_RC:-0}" -ne 0 ]; then
+        # 动作失败时停下让用户看错误；只打印结果（列表/状态/日志）时
+        # 也必须停下，否则下一轮清屏，结果一闪而过。
+        if [ "${PIKA_DISPATCH_RC:-0}" -ne 0 ] || [ "${UI_MENU_RENDERED:-0}" -eq 0 ]; then
             PIKA_KEEP_SCREEN=1
-            printf '\n  %s ' "$(t 'ui.press_enter')"
-            read -r _ || return 0
+            ui_pause
         fi
     done
 }
@@ -745,6 +746,7 @@ main() {
         fi
 
         local cidx=1 found=0
+        UI_MENU_RENDERED=0
         for entry in "${MENU_MAIN[@]}"; do
             if [ "$cidx" = "$sel" ]; then
                 local key title_key desc_key handler
@@ -755,6 +757,12 @@ main() {
             fi
             cidx=$((cidx + 1))
         done
+
+        # 没有进入子菜单说明这条只是打印结果（如安装脚本说明），
+        # 停一下再清屏，否则内容会立刻消失。
+        if [ "$found" = "1" ] && [ "${UI_MENU_RENDERED:-0}" -eq 0 ]; then
+            ui_pause
+        fi
 
         [ "$found" = "0" ] && { pika_warn "$(t 'ui.invalid'): $sel"; sleep 1; }
     done

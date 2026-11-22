@@ -1660,16 +1660,15 @@ _nginx_menu_loop() {
             continue
         fi
         rc=0
+        UI_MENU_RENDERED=0
         ui_dispatch "$arr_name" "$sel" || rc=$?
         if [ "$rc" -eq 2 ]; then
             return 0
         fi
-        # Pause only when the action failed; a successful action returns
-        # straight to the menu (logs stay on screen).
-        if [ "${PIKA_DISPATCH_RC:-0}" -ne 0 ]; then
+        # 失败要停；只打印结果（列表/状态/日志）也要停，否则清屏后一闪而过。
+        if [ "${PIKA_DISPATCH_RC:-0}" -ne 0 ] || [ "${UI_MENU_RENDERED:-0}" -eq 0 ]; then
             PIKA_KEEP_SCREEN=1
-            printf '\n  %s ' "$(t 'ui.press_enter')"
-            read -r _ || return 0
+            ui_pause
         fi
     done
 }

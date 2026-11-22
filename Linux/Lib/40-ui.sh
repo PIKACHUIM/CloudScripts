@@ -12,6 +12,9 @@ set -e
 : "${PIKA_CYAN:=$(printf '\033[0;36m')}"; : "${PIKA_MAGENTA:=$(printf '\033[0;35m')}"
 : "${PIKA_BOLD:=$(printf '\033[1m')}"; : "${PIKA_NC:=$(printf '\033[0m')}"
 
+# ---- Set to 1 by ui_menu(), read by the menu loops ----
+UI_MENU_RENDERED=0
+
 # ============================================================
 #  CJK-aware display width (pure bash, no external deps)
 #  Uses python3 if available (accurate east-asian-width),
@@ -317,6 +320,10 @@ ui_menu() {
     local title="$1" array_name="$2" back_label="${3:-}"
     local -n entries="$array_name"
 
+    # 记录“本次动作里画过菜单”，菜单循环据此决定是否需要暂停等回车：
+    # 画过菜单说明已经和用户交互过，没画过说明只是打印结果（列表/状态/日志）。
+    UI_MENU_RENDERED=1
+
     ui_menu_size "$array_name" "$back_label"
     local row_w="$_UI_ROW_W"
 
@@ -334,6 +341,18 @@ ui_menu() {
     printf '\n'
     ui_divider "$((row_w - 2))"
     printf '  %s ' "$(t 'menu.prompt')"
+}
+
+# ============================================================
+#  Pause so printed results stay readable
+#  Menus clear the screen before redrawing, so an action that only
+#  prints (site list, status, logs, probe result) would flash by.
+#  ui_dispatch callers pause with this unless the handler drew a menu.
+# ============================================================
+ui_pause() {
+    printf '\n  %s ' "$(t 'ui.press_enter')"
+    read -r _ || true
+    return 0
 }
 
 # ============================================================
