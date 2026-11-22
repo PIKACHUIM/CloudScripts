@@ -685,10 +685,13 @@ do_nginx_site_add() {
                 fi
             else
                 pika_info "$(t 'nginx.cert.none')"
-                if ! cert_id=$(_nginx_cert_import_flow); then
-                    pika_info "$(t 'ui.cancelled')"
+                local import_rc=0
+                _nginx_cert_import_flow || import_rc=$?
+                if [ "$import_rc" -ne 0 ]; then
+                    [ "$import_rc" -eq 1 ] && pika_info "$(t 'ui.cancelled')"
                     return 1
                 fi
+                cert_id="$PIKA_CERT_IMPORT_ID"
             fi
             ;;
         3) tls_mode="internal" ;;
@@ -846,10 +849,13 @@ do_nginx_site_edit() {
                 fi
             else
                 pika_info "$(t 'nginx.cert.none')"
-                if ! cert_id=$(_nginx_cert_import_flow); then
-                    pika_info "$(t 'ui.cancelled')"
+                local import_rc=0
+                _nginx_cert_import_flow || import_rc=$?
+                if [ "$import_rc" -ne 0 ]; then
+                    [ "$import_rc" -eq 1 ] && pika_info "$(t 'ui.cancelled')"
                     return 0
                 fi
+                cert_id="$PIKA_CERT_IMPORT_ID"
             fi
             ;;
         3) tls_mode="internal" ;;
@@ -1103,8 +1109,12 @@ _nginx_cert_tmp_drop() {
     done
 }
 
+# 成功时把证书 id 放进 PIKA_CERT_IMPORT_ID 并返回 0；
+# 返回 1 = 用户取消（不打印），2 = 已打印具体错误。
+# 不要再放到 $(...) 里调用：提示与错误会被命令替换吞掉。
 _nginx_cert_import_flow() {
     local c k id dir d rc
+    PIKA_CERT_IMPORT_ID=""
     UI_PEM_PUSHBACK=""
     c=$(mktemp 2>/dev/null || echo "/tmp/pika-cert-$$.pem")
     k=$(mktemp 2>/dev/null || echo "/tmp/pika-key-$$.pem")
@@ -1115,31 +1125,29 @@ _nginx_cert_import_flow() {
     ui_read_pem "$(t 'nginx.cert.certpath')" "$c" "CERTIFICATE-----"
     rc=$?
     if [ "$rc" -ne 0 ]; then
-        case "$rc" in
-            2) pika_err "$(t 'nginx.cert.missing'): ${UI_PEM_INPUT:-?}" ;;
-            3) pika_err "$(t 'ui.pem.incomplete')" ;;
-            *) pika_info "$(t 'ui.cancelled')" ;;
-        esac
         _nginx_cert_tmp_drop "$c" "$k"
-        return 1
+        case "$rc" in
+            2) pika_err "$(t 'nginx.cert.missing'): ${UI_PEM_INPUT:-?}"; return 2 ;;
+            3) pika_err "$(t 'ui.pem.incomplete')"; return 2 ;;
+            *) return 1 ;;
+        esac
     fi
 
     ui_read_pem "$(t 'nginx.cert.keypath')" "$k" "PRIVATE KEY-----"
     rc=$?
     if [ "$rc" -ne 0 ]; then
-        case "$rc" in
-            2) pika_err "$(t 'nginx.cert.missing'): ${UI_PEM_INPUT:-?}" ;;
-            3) pika_err "$(t 'ui.pem.incomplete')" ;;
-            *) pika_info "$(t 'ui.cancelled')" ;;
-        esac
         _nginx_cert_tmp_drop "$c" "$k"
-        return 1
+        case "$rc" in
+            2) pika_err "$(t 'nginx.cert.missing'): ${UI_PEM_INPUT:-?}"; return 2 ;;
+            3) pika_err "$(t 'ui.pem.incomplete')"; return 2 ;;
+            *) return 1 ;;
+        esac
     fi
 
     if ! _nginx_cert_pair_ok "$c" "$k"; then
         pika_err "$(t 'nginx.cert.pairinvalid')"
         _nginx_cert_tmp_drop "$c" "$k"
-        return 1
+        return 2
     fi
 
     d=$(_nginx_cert_domains "$c")
@@ -1160,7 +1168,8 @@ _nginx_cert_import_flow() {
     _nginx_meta_file_set "${dir}/meta" "domains" "$d"
     _nginx_meta_file_set "${dir}/meta" "source" "upload"
     _nginx_meta_file_set "${dir}/meta" "created" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf '%s' "$id"
+    PIKA_CERT_IMPORT_ID="$id"
+    return 0
 }
 
 _nginx_print_certs() {
@@ -1216,11 +1225,14 @@ do_nginx_cert_list() {
 do_nginx_cert_upload() {
     _nginx_require || return 1
     _nginx_ensure_dirs
-    local id
-    if ! id=$(_nginx_cert_import_flow); then
-        pika_info "$(t 'ui.cancelled')"
+    local rc=0
+    # 直接调用（不要复用 $(...)）：提示、错误和粘贴输入都在同一个终端里
+    _nginx_cert_import_flow || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        [ "$rc" -eq 1 ] && pika_info "$(t 'ui.cancelled')"
         return 0
     fi
+    local id="$PIKA_CERT_IMPORT_ID"
     pika_info "$(t 'nginx.cert.uploaded'): $id"
     if pika_confirm "$(t 'nginx.cert.bind')"; then
         _nginx_bind_cert_to_site "$id" || true

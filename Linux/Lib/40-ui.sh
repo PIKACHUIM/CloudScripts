@@ -370,22 +370,28 @@ UI_PEM_PUSHBACK=""
 #  UI_PEM_INPUT keeps the raw first line so callers can echo it back.
 # ============================================================
 ui_read_pem() {
-    local prompt="$1" out="$2" endmark="$3" line peek ended=0
+    local prompt="$1" out="$2" endmark="$3" line peek ended=0 tries=0
     UI_PEM_INPUT=""
 
-    if [ -n "${UI_PEM_PUSHBACK:-}" ]; then
-        line="$UI_PEM_PUSHBACK"
-        UI_PEM_PUSHBACK=""
-    else
-        printf '  %s: ' "$prompt"
-        IFS= read -r line || return 1
-    fi
-    line=${line%$'\r'}
-    # 去掉首尾空白，以及从别处粘贴时带上的双引号
-    line="${line#"${line%%[![:space:]]*}"}"
-    line="${line%"${line##*[![:space:]]}"}"
-    line="${line%\"}"; line="${line#\"}"
-    [ -n "$line" ] || return 1
+    # 空行不当成取消：提示一句继续等，最多三次（Ctrl-D / EOF 才算取消）
+    while :; do
+        if [ -n "${UI_PEM_PUSHBACK:-}" ]; then
+            line="$UI_PEM_PUSHBACK"
+            UI_PEM_PUSHBACK=""
+        else
+            printf '  %s: ' "$prompt"
+            IFS= read -r line || return 1
+        fi
+        line=${line%$'\r'}
+        # 去掉首尾空白，以及从别处粘贴时带上的双引号
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        line="${line%\"}"; line="${line#\"}"
+        [ -n "$line" ] && break
+        tries=$((tries + 1))
+        [ "$tries" -ge 3 ] && return 1
+        printf '  %s\n' "$(t 'ui.pem.empty')"
+    done
     UI_PEM_INPUT="$line"
 
     case "$line" in

@@ -813,3 +813,4 @@ T_nginx_cert_renew_unknown="未知证书来源，无法续期"
 # ---- 证书粘贴输入 ----
 T_ui_pem_tip="可粘贴 PEM 内容（以 -----BEGIN 开头，粘贴完按一次回车），也可直接输入文件路径"
 T_ui_pem_incomplete="没有读到 -----END 结束行，请重新粘贴完整内容"
+T_ui_pem_empty="内容不能为空：请粘贴 PEM 内容，或输入文件路径（Ctrl-D 取消）"

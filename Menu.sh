@@ -20,7 +20,7 @@ if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ] || { [ "${BASH_VERSINFO[0]:-0}" -eq 4 ] &&
     exit 1
 fi
 
-PIKA_VERSION="1.8"
+PIKA_VERSION="1.9"
 PIKA_BASE="$(cd "$(dirname "$0")" && pwd)"
 PIKA_LIB_DIR="${PIKA_BASE}/Linux/Lib"
 PIKA_MOD_DIR="${PIKA_BASE}/Linux/Modules"

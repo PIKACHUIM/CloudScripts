@@ -813,3 +813,4 @@ T_nginx_cert_renew_unknown="Unknown certificate source, cannot renew"
 # ---- Certificate paste input ----
 T_ui_pem_tip="Paste the PEM content (starts with -----BEGIN, press Enter when done) or type a file path"
 T_ui_pem_incomplete="No -----END line found - paste the complete PEM block again"
+T_ui_pem_empty="Content cannot be empty: paste the PEM or type a file path (Ctrl-D to cancel)"
