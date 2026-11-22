@@ -43,9 +43,14 @@ svc_detect_backend() {
 }
 
 svc_backend() {
-    [ -n "$PIKA_SVC_BACKEND" ] && { echo "$PIKA_SVC_BACKEND"; return; }
-    PIKA_SVC_BACKEND=$(svc_detect_backend)
-    export PIKA_SVC_BACKEND
+    # Must always print the backend: callers use $(svc_backend), which runs in
+    # a subshell, so caching into the global alone would return an empty string
+    # and every case dispatch below silently matched nothing.
+    if [ -z "${PIKA_SVC_BACKEND:-}" ]; then
+        PIKA_SVC_BACKEND=$(svc_detect_backend)
+        export PIKA_SVC_BACKEND
+    fi
+    printf '%s\n' "$PIKA_SVC_BACKEND"
 }
 
 # ---- Interactive backend selection ----
@@ -107,6 +112,72 @@ UNITEOF
 }
 
 # ============================================================
+#  nohup backend state (pid + command), so start/stop/restart work
+#  in containers without systemd. Previously "restart" killed the
+#  process and left nothing running.
+# ============================================================
+_SVC_STATE_DIR="${PIKA_CONFIG_DIR}/services"
+_SVC_LOG_DIR="${PIKA_SVC_LOG_DIR:-/var/log}"
+
+_svc_nohup_dir() {
+    mkdir -p "$_SVC_STATE_DIR" 2>/dev/null || true
+    printf '%s' "$_SVC_STATE_DIR"
+}
+
+_svc_nohup_pid() {
+    local name="$1" pf pid
+    pf="$(_svc_nohup_dir)/${name}.pid"
+    [ -f "$pf" ] || return 1
+    pid=$(cat "$pf" 2>/dev/null || true)
+    case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+    kill -0 "$pid" 2>/dev/null || return 1
+    printf '%s' "$pid"
+}
+
+_svc_nohup_start() {
+    local name="$1" cmd wd cmd_file wd_file
+    cmd_file="$(_svc_nohup_dir)/${name}.cmd"
+    wd_file="$(_svc_nohup_dir)/${name}.dir"
+    [ -f "$cmd_file" ] || { pika_err "找不到服务启动命令: $cmd_file"; return 1; }
+    cmd=$(cat "$cmd_file" 2>/dev/null || true)
+    [ -n "$cmd" ] || return 1
+    if _svc_nohup_pid "$name" >/dev/null 2>&1; then
+        return 0
+    fi
+    wd="/"
+    [ -f "$wd_file" ] && wd=$(cat "$wd_file" 2>/dev/null || echo "/")
+    [ -d "$wd" ] || wd="/"
+    (
+        cd "$wd" 2>/dev/null || cd /
+        nohup bash -c "$cmd" >> "${_SVC_LOG_DIR}/${name}.log" 2>&1 &
+        echo $! > "$(_svc_nohup_dir)/${name}.pid"
+    )
+    sleep 1
+    if _svc_nohup_pid "$name" >/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
+_svc_nohup_stop() {
+    local name="$1" pid i=0
+    pid=$(_svc_nohup_pid "$name" 2>/dev/null || true)
+    if [ -z "$pid" ]; then
+        rm -f "$(_svc_nohup_dir)/${name}.pid" 2>/dev/null || true
+        return 0
+    fi
+    kill "$pid" 2>/dev/null || true
+    while [ "$i" -lt 10 ]; do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 1
+        i=$((i + 1))
+    done
+    kill -9 "$pid" 2>/dev/null || true
+    rm -f "$(_svc_nohup_dir)/${name}.pid" 2>/dev/null || true
+    return 0
+}
+
+# ============================================================
 #  Unified service management
 # ============================================================
 
@@ -152,12 +223,15 @@ svc_register() {
             ;;
 
         nohup)
-            # Kill existing instance
-            pkill -f "$exec_cmd" 2>/dev/null || true
-            cd "$workdir"
-            nohup $exec_cmd >> "/var/log/${name}.log" 2>&1 &
+            mkdir -p "$(_svc_nohup_dir)" 2>/dev/null || true
+            printf '%s\n' "$exec_cmd" > "$(_svc_nohup_dir)/${name}.cmd"
+            printf '%s\n' "$workdir" > "$(_svc_nohup_dir)/${name}.dir"
+            _svc_nohup_stop "$name"
+            if ! _svc_nohup_start "$name"; then
+                pika_warn "无法启动 nohup 服务: $name"
+            fi
             # Add to /run.sh for container auto-start
-            pika_file_append_unique "nohup $exec_cmd >> /var/log/${name}.log 2>&1 &" "/run.sh"
+            pika_file_append_unique "nohup $exec_cmd >> ${_SVC_LOG_DIR}/${name}.log 2>&1 &" "/run.sh"
             ;;
     esac
 }
@@ -168,10 +242,30 @@ svc_start() {
     local backend; backend=$(svc_backend)
 
     case "$backend" in
-        pm2)     pm2 start "$name" 2>/dev/null || pika_warn "无法启动 PM2 服务: $name" ;;
-        systemd) systemctl start "$name" 2>/dev/null || pika_warn "无法启动 systemd 服务: $name" ;;
-        nohup)   pika_warn "nohup 服务请手动启动" ;;
+        pm2)
+            local out
+            if ! out=$(pm2 start "$name" 2>&1); then
+                pika_warn "无法启动 PM2 服务: $name"
+                [ -n "$out" ] && printf '%s\n' "$out" >&2
+                return 1
+            fi
+            ;;
+        systemd)
+            local out
+            if ! out=$(systemctl start "$name" 2>&1); then
+                pika_warn "无法启动 systemd 服务: $name"
+                [ -n "$out" ] && printf '%s\n' "$out" >&2
+                return 1
+            fi
+            ;;
+        nohup)
+            if ! _svc_nohup_start "$name"; then
+                pika_warn "无法启动 nohup 服务: $name"
+                return 1
+            fi
+            ;;
     esac
+    return 0
 }
 
 # ---- Stop a service ----
@@ -182,7 +276,7 @@ svc_stop() {
     case "$backend" in
         pm2)     pm2 stop "$name" 2>/dev/null || true ;;
         systemd) systemctl stop "$name" 2>/dev/null || true ;;
-        nohup)   pkill -f "$name" 2>/dev/null || true ;;
+        nohup)   _svc_nohup_stop "$name" ;;
     esac
 }
 
@@ -194,20 +288,31 @@ svc_restart() {
     case "$backend" in
         pm2)     pm2 restart "$name" 2>/dev/null || pika_warn "无法重启 PM2 服务: $name" ;;
         systemd) systemctl restart "$name" 2>/dev/null || pika_warn "无法重启 systemd 服务: $name" ;;
-        nohup)   pkill -f "$name" 2>/dev/null || true; pika_warn "nohup 服务请手动重启" ;;
+        nohup)
+            _svc_nohup_stop "$name"
+            _svc_nohup_start "$name" || pika_warn "无法重启 nohup 服务: $name"
+            ;;
     esac
 }
 
-# ---- Get service status ----
+# ---- Get service status (informational: always returns 0) ----
 svc_status() {
     local name="$1"; [ -z "$name" ] && return 1
     local backend; backend=$(svc_backend)
 
     case "$backend" in
-        pm2)     pm2 describe "$name" 2>/dev/null || { echo "NOT FOUND"; return 1; } ;;
-        systemd) systemctl status "$name" --no-pager -l 2>/dev/null || { echo "NOT FOUND"; return 1; } ;;
-        nohup)   pgrep -f "$name" >/dev/null 2>&1 && echo "RUNNING" || echo "STOPPED" ;;
+        pm2)     pm2 describe "$name" 2>/dev/null || echo "NOT FOUND" ;;
+        systemd) systemctl status "$name" --no-pager -l 2>/dev/null || echo "NOT FOUND" ;;
+        nohup)
+            local pid
+            if pid=$(_svc_nohup_pid "$name"); then
+                echo "RUNNING (pid $pid)"
+            else
+                echo "STOPPED"
+            fi
+            ;;
     esac
+    return 0
 }
 
 # ---- View service logs ----
@@ -218,7 +323,7 @@ svc_logs() {
     case "$backend" in
         pm2)     pm2 logs "$name" --lines "$lines" --nostream 2>/dev/null || pika_warn "无 PM2 日志" ;;
         systemd) journalctl -u "$name" -n "$lines" --no-pager 2>/dev/null || pika_warn "无 systemd 日志" ;;
-        nohup)   tail -n "$lines" "/var/log/${name}.log" 2>/dev/null || pika_warn "无 nohup 日志" ;;
+        nohup)   tail -n "$lines" "${_SVC_LOG_DIR}/${name}.log" 2>/dev/null || pika_warn "无 nohup 日志" ;;
     esac
 }
 
@@ -239,8 +344,9 @@ svc_remove() {
             systemctl daemon-reload
             ;;
         nohup)
-            pkill -f "$name" 2>/dev/null || true
-            rm -f "/var/log/${name}.log"
+            _svc_nohup_stop "$name"
+            rm -f "$(_svc_nohup_dir)/${name}.cmd" "$(_svc_nohup_dir)/${name}.dir" 2>/dev/null || true
+            rm -f "${_SVC_LOG_DIR}/${name}.log"
             ;;
     esac
     pika_info "服务已卸载: $name"

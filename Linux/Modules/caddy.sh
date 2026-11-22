@@ -235,6 +235,35 @@ _caddy_validate() {
     return 1
 }
 
+# ---- Why is it not running? Show config/log/port evidence ----
+_caddy_fail_hint() {
+    local name vout busy
+    name=$(_caddy_svc_name)
+    pika_warn "$(t 'caddy.service.stopped')"
+    pika_info "$(t 'caddy.service.hint')"
+
+    if [ -x "$CADDY_BIN" ] && [ -f "$CADDY_MAIN_CONF" ]; then
+        if ! vout=$("$CADDY_BIN" validate --config "$CADDY_MAIN_CONF" --adapter caddyfile 2>&1); then
+            pika_err "$(t 'caddy.config.invalid')"
+            printf '%s\n' "$vout" >&2
+        fi
+    fi
+
+    busy=""
+    if command -v ss >/dev/null 2>&1; then
+        busy=$(ss -lntp 2>/dev/null | grep -E ':(80|443|2019)[[:space:]]' || true)
+    elif command -v netstat >/dev/null 2>&1; then
+        busy=$(netstat -lntp 2>/dev/null | grep -E ':(80|443|2019)[[:space:]]' || true)
+    fi
+    if [ -n "$busy" ]; then
+        pika_warn "$(t 'caddy.port.busy')"
+        printf '%s\n' "$busy" >&2
+    fi
+
+    svc_logs "$name" 15 2>/dev/null || true
+    return 0
+}
+
 _caddy_apply() {
     _caddy_validate || return 1
     if _caddy_running; then
@@ -246,8 +275,7 @@ _caddy_apply() {
         svc_start "$(_caddy_svc_name)" || true
         sleep 1
         if ! _caddy_running; then
-            pika_warn "$(t 'caddy.service.stopped')"
-            pika_info "$(t 'caddy.service.hint')"
+            _caddy_fail_hint
         fi
     fi
     return 0
@@ -377,8 +405,7 @@ do_caddy_install() {
     if _caddy_running; then
         pika_info "$(t 'caddy.install.success'): $("$CADDY_BIN" version 2>/dev/null | head -1)"
     else
-        pika_warn "$(t 'caddy.service.stopped')"
-        pika_info "$(t 'caddy.service.hint')"
+        _caddy_fail_hint
     fi
     printf '  %s: %s\n' "$(t 'caddy.service.config')" "$CADDY_MAIN_CONF"
     printf '  %s: %s\n' "$(t 'caddy.service.name')" "$name"
@@ -1016,7 +1043,7 @@ do_caddy_start() {
         pika_info "$(t 'caddy.started')"
         return 0
     fi
-    pika_err "$(t 'caddy.service.stopped')"
+    _caddy_fail_hint
     return 1
 }
 
@@ -1035,7 +1062,7 @@ do_caddy_restart() {
         pika_info "$(t 'caddy.restarted')"
         return 0
     fi
-    pika_err "$(t 'caddy.service.stopped')"
+    _caddy_fail_hint
     return 1
 }
 
