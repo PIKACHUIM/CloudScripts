@@ -80,6 +80,7 @@ bash <(curl -fsSL https://pikash.pika.net.cn/Menu.sh) --mirror=https://pikash.op
 | 🔧 系统维护 | 内核与 BBR、Swap、防火墙、清理、重装、监控 |
 | 🎨 桌面环境 | Debian LXC 容器内的 8 种图形桌面 |
 | 📊 性能测评 | 融合怪、YABS、UnixBench、IP 质量、路由追踪等 |
+| 📦 软件安装 | 网络穿透、面板监控、建站媒体、存储协作、账号安全、AI 开发、阅读工具 |
 | 🌐 代理组网 | 3X-UI、Clash、Hysteria2、WireGuard、Tailscale 等 |
 | 🛡️ 反向代理 | Caddy / Nginx 二选一，站点与证书统一管理 |
 | 🛠️ 系统工具 | SSH 加固、时区、主机名、自更新、卸载回滚 |

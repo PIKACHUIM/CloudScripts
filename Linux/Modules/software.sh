@@ -5,75 +5,107 @@
 # ============================================================
 set -e
 
+# 软件安装按用途分类：一屏最多 10 项，避免一次列出五十多个
 SoftwareMENU=(
-# === 网络与服务 ===
+    "net|software.cat.net|software.cat.net.desc|do_soft_cat_net"
+    "panel|software.cat.panel|software.cat.panel.desc|do_soft_cat_panel"
+    "site|software.cat.site|software.cat.site.desc|do_soft_cat_site"
+    "store|software.cat.store|software.cat.store.desc|do_soft_cat_store"
+    "security|software.cat.security|software.cat.security.desc|do_soft_cat_security"
+    "ai|software.cat.ai|software.cat.ai.desc|do_soft_cat_ai"
+    "read|software.cat.read|software.cat.read.desc|do_soft_cat_read"
+)
+
+# ---- 网络与穿透 ----
+SoftwareNetMENU=(
     "lucky|software.lucky|software.lucky.desc|do_soft_lucky"
     "npm|software.npm|software.npm.desc|do_soft_npm"
     "ddnsgo|software.ddnsgo|software.ddnsgo.desc|do_soft_ddnsgo"
-# === AI 对话前端 ===
-    "lobechat|software.lobechat|software.lobechat.desc|do_soft_lobechat"
-    "openwebui|software.openwebui|software.openwebui.desc|do_soft_openwebui"
-# === 面板与管理 ===
+    "cloudflareddns|software.cloudflareddns|software.cloudflareddns.desc|do_soft_cloudflareddns"
+    "nps|software.nps|software.nps.desc|do_soft_nps"
+    "easytier|software.easytier|software.easytier.desc|do_soft_easytier"
+    "frps|software.frps|software.frps.desc|do_soft_frps"
+    "rustdesk|software.rustdesk|software.rustdesk.desc|do_soft_rustdesk"
+)
+
+# ---- 面板与监控 ----
+SoftwarePanelMENU=(
     "portainer|software.portainer|software.portainer.desc|do_soft_portainer"
     "dockge|software.dockge|software.dockge.desc|do_soft_dockge"
     "glance|software.glance|software.glance.desc|do_soft_glance"
     "homarr|software.homarr|software.homarr.desc|do_soft_homarr"
     "sunpanel|software.sunpanel|software.sunpanel.desc|do_soft_sunpanel"
     "homepage|software.homepage|software.homepage.desc|do_soft_homepage"
-# === 博客与 CMS ===
+    "uptimekuma|software.uptimekuma|software.uptimekuma.desc|do_soft_uptimekuma"
+    "speedtest|software.speedtest|software.speedtest.desc|do_soft_speedtest"
+    "it_tools|software.it_tools|software.it_tools.desc|do_soft_it_tools"
+)
+
+# ---- 建站与媒体 ----
+SoftwareSiteMENU=(
     "halo|software.halo|software.halo.desc|do_soft_halo"
     "typecho|software.typecho|software.typecho.desc|do_soft_typecho"
-# === 影音媒体 ===
     "jellyfin|software.jellyfin|software.jellyfin.desc|do_soft_jellyfin"
     "navidrome|software.navidrome|software.navidrome.desc|do_soft_navidrome"
     "immich|software.immich|software.immich.desc|do_soft_immich"
     "openlist|software.openlist|software.openlist.desc|do_soft_openlist"
-# === 下载工具 ===
     "qbit|software.qbit|software.qbit.desc|do_soft_qbit"
     "aria2pro|software.aria2pro|software.aria2pro.desc|do_soft_aria2pro"
     "transmission|software.transmission|software.transmission.desc|do_soft_transmission"
-# === 密码与安全 ===
-    "vaultwarden|software.vaultwarden|software.vaultwarden.desc|do_soft_vaultwarden"
-    "casdoor|software.casdoor|software.casdoor.desc|do_soft_casdoor"
-    "privatebin|software.privatebin|software.privatebin.desc|do_soft_privatebin"
-    "cloudflareddns|software.cloudflareddns|software.cloudflareddns.desc|do_soft_cloudflareddns"
-# === 内网穿透与组网 ===
-    "nps|software.nps|software.nps.desc|do_soft_nps"
-# === 存储与同步 ===
+    "mcsmanager|software.mcsmanager|software.mcsmanager.desc|do_soft_mcsmanager"
+)
+
+# ---- 存储与协作 ----
+SoftwareStoreMENU=(
     "nextcloud|software.nextcloud|software.nextcloud.desc|do_soft_nextcloud"
     "syncthing|software.syncthing|software.syncthing.desc|do_soft_syncthing"
     "filebrowser|software.filebrowser|software.filebrowser.desc|do_soft_filebrowser"
-# === 搜索引擎 ===
-    "searxng|software.searxng|software.searxng.desc|do_soft_searxng"
-# === AI 与 API ===
-    "oneapi|software.oneapi|software.oneapi.desc|do_soft_oneapi"
-    "newapi|software.newapi|software.newapi.desc|do_soft_newapi"
-    "cliproxyapi|software.cliproxyapi|software.cliproxyapi.desc|do_soft_cliproxyapi"
-    "sub2api|software.sub2api|software.sub2api.desc|do_soft_sub2api"
-# === 开发与自动化 ===
-    "gitea|software.gitea|software.gitea.desc|do_soft_gitea"
-    "n8n|software.n8n|software.n8n.desc|do_soft_n8n"
-    "nodered|software.nodered|software.nodered.desc|do_soft_nodered"
-    "it_tools|software.it_tools|software.it_tools.desc|do_soft_it_tools"
-    "stirlingpdf|software.stirlingpdf|software.stirlingpdf.desc|do_soft_stirlingpdf"
-# === 生产力 ===
     "siyuan|software.siyuan|software.siyuan.desc|do_soft_siyuan"
     "memos|software.memos|software.memos.desc|do_soft_memos"
     "trilium|software.trilium|software.trilium.desc|do_soft_trilium"
     "excalidraw|software.excalidraw|software.excalidraw.desc|do_soft_excalidraw"
     "vikunja|software.vikunja|software.vikunja.desc|do_soft_vikunja"
     "homebox|software.homebox|software.homebox.desc|do_soft_homebox"
-# === 阅读与信息 ===
+)
+
+# ---- 账号与安全 ----
+SoftwareSecurityMENU=(
+    "vaultwarden|software.vaultwarden|software.vaultwarden.desc|do_soft_vaultwarden"
+    "casdoor|software.casdoor|software.casdoor.desc|do_soft_casdoor"
+    "privatebin|software.privatebin|software.privatebin.desc|do_soft_privatebin"
+)
+
+# ---- AI 与开发 ----
+SoftwareAiMENU=(
+    "lobechat|software.lobechat|software.lobechat.desc|do_soft_lobechat"
+    "openwebui|software.openwebui|software.openwebui.desc|do_soft_openwebui"
+    "oneapi|software.oneapi|software.oneapi.desc|do_soft_oneapi"
+    "newapi|software.newapi|software.newapi.desc|do_soft_newapi"
+    "cliproxyapi|software.cliproxyapi|software.cliproxyapi.desc|do_soft_cliproxyapi"
+    "sub2api|software.sub2api|software.sub2api.desc|do_soft_sub2api"
+    "gitea|software.gitea|software.gitea.desc|do_soft_gitea"
+    "n8n|software.n8n|software.n8n.desc|do_soft_n8n"
+    "nodered|software.nodered|software.nodered.desc|do_soft_nodered"
+)
+
+# ---- 阅读与工具 ----
+SoftwareReadMENU=(
+    "searxng|software.searxng|software.searxng.desc|do_soft_searxng"
     "miniflux|software.miniflux|software.miniflux.desc|do_soft_miniflux"
     "wallabag|software.wallabag|software.wallabag.desc|do_soft_wallabag"
     "changedetection|software.changedetection|software.changedetection.desc|do_soft_changedetection"
-# === 消息推送 ===
     "bark|software.bark|software.bark.desc|do_soft_bark"
-# === 监控 ===
-    "uptimekuma|software.uptimekuma|software.uptimekuma.desc|do_soft_uptimekuma"
-    "speedtest|software.speedtest|software.speedtest.desc|do_soft_speedtest"
-    "mcsmanager|software.mcsmanager|software.mcsmanager.desc|do_soft_mcsmanager"
+    "stirlingpdf|software.stirlingpdf|software.stirlingpdf.desc|do_soft_stirlingpdf"
 )
+
+# ─── 分类子菜单 ──────────────────────────────────────────────
+do_soft_cat_net()      { _menu_loop "net" "SoftwareNetMENU" "software.cat.net"; }
+do_soft_cat_panel()    { _menu_loop "panel" "SoftwarePanelMENU" "software.cat.panel"; }
+do_soft_cat_site()     { _menu_loop "site" "SoftwareSiteMENU" "software.cat.site"; }
+do_soft_cat_store()    { _menu_loop "store" "SoftwareStoreMENU" "software.cat.store"; }
+do_soft_cat_security() { _menu_loop "security" "SoftwareSecurityMENU" "software.cat.security"; }
+do_soft_cat_ai()       { _menu_loop "ai" "SoftwareAiMENU" "software.cat.ai"; }
+do_soft_cat_read()     { _menu_loop "read" "SoftwareReadMENU" "software.cat.read"; }
 
 # ─── Shared helpers ──────────────────────────────────────────
 _soft_ensure_docker() {
@@ -365,6 +397,24 @@ do_soft_nps() {
     pika_info "$(t 'state.installing') NPS..."
     pika_run_remote --errexit "https://raw.githubusercontent.com/ehang-io/nps/master/scripts/install.sh"
     pika_info "$(t 'common.done') - http://localhost:8080 (admin/123)"
+}
+
+do_soft_easytier() {
+    ui_confirm_install "EasyTier" "$(t 'software.easytier.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') EasyTier..."
+    pika_run_remote "Linux/VPSSets/Setup.sh" 7
+}
+
+do_soft_frps() {
+    ui_confirm_install "FRPS" "$(t 'software.frps.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') FRPS..."
+    pika_run_remote "Linux/VPSSets/Setup.sh" 8
+}
+
+do_soft_rustdesk() {
+    ui_confirm_install "RustDesk" "$(t 'software.rustdesk.desc')" || { pika_info "$(t 'ui.cancelled')"; return; }
+    pika_info "$(t 'state.installing') RustDesk relay..."
+    pika_run_remote "Linux/VPSSets/Setup.sh" A
 }
 
 # ─── 存储与同步 ──────────────────────────────────────────────

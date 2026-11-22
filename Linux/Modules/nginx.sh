@@ -1502,7 +1502,6 @@ _nginx_menu_loop() {
             ui_header
         fi
         PIKA_KEEP_SCREEN=0
-        ui_divider
         ui_menu "$(t "$title_key")" "$arr_name" "$(t 'menu.back')"
         read -r sel || return 0
         if ui_is_back "$sel"; then return 0; fi

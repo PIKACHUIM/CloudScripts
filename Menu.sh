@@ -507,7 +507,6 @@ _menu_loop() {
             ui_header
         fi
         PIKA_KEEP_SCREEN=0
-        ui_divider
         ui_menu "$(t "$title_key")" "$arr_name" "$(t 'menu.back')"
         read -r sel || return 0
 
@@ -576,13 +575,17 @@ main() {
 
     # Interactive main menu loop
     while true; do
+        # Size the columns from MENU_MAIN so no title or description is cut off.
+        ui_menu_size "MENU_MAIN" "$(t 'menu.exit')"
+        local row_w="$_UI_ROW_W"
+
         ui_clear
         ui_header
-        ui_divider
+        ui_divider "$((row_w - 2))"
         ui_section "$(t 'menu.main')"
         ui_sysinfo
         echo ""
-        ui_divider
+        ui_divider "$((row_w - 2))"
 
         local idx=1
         for entry in "${MENU_MAIN[@]}"; do

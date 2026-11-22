@@ -17,10 +17,28 @@ set -e
 #  Uses python3 if available (accurate east-asian-width),
 #  otherwise a fast UTF-8 byte heuristic (3/4-byte lead -> 2-wide).
 # ============================================================
+# ---- python3 probe (cached once at load: on Windows the store alias is slow/stub) ----
+# Must run outside command substitution, otherwise the cache is lost per subshell.
+_ui_detect_python() {
+    [ -n "${_UI_HAS_PY:-}" ] && return 0
+    if command -v python3 >/dev/null 2>&1 \
+        && [ "$(python3 -c 'print(1)' 2>/dev/null)" = "1" ]; then
+        _UI_HAS_PY=1
+    else
+        _UI_HAS_PY=0
+    fi
+}
+_ui_detect_python
+
+_ui_py_ok() {
+    [ -n "${_UI_HAS_PY:-}" ] || _ui_detect_python
+    [ "$_UI_HAS_PY" = "1" ]
+}
+
 _ui_str_width() {
     local s="$1"
     # Prefer python3 for accuracy
-    if command -v python3 >/dev/null 2>&1 && python3 -c "" 2>/dev/null; then
+    if _ui_py_ok; then
         local w
         w=$(python3 -c "import sys,unicodedata; s=sys.argv[1]; print(sum(2 if unicodedata.east_asian_width(c) in ('W','F') else 1 for c in s))" -- "$s" 2>/dev/null)
         if [ -n "$w" ] && [ "$w" -ge 0 ] 2>/dev/null; then
@@ -77,15 +95,7 @@ _ui_str_pad() {
     [ "$target" -le 0 ] && return 0
 
     # Prefer python3 for exact east-asian-width; otherwise use the bash heuristic.
-    if [ -z "${_UI_HAS_PY:-}" ]; then
-        if command -v python3 >/dev/null 2>&1 && python3 -c "" 2>/dev/null; then
-            _UI_HAS_PY=1
-        else
-            _UI_HAS_PY=0
-        fi
-    fi
-
-    if [ "$_UI_HAS_PY" = "1" ]; then
+    if _ui_py_ok; then
         python3 -c '
 import sys, unicodedata
 s = sys.argv[1]; target = int(sys.argv[2])
@@ -179,9 +189,11 @@ ui_section() {
     printf '\n  %s%s▸ %s%s\n' "${PIKA_YELLOW}" "${PIKA_BOLD}" "$1" "${PIKA_NC}"
 }
 
-# ---- Divider ----
+# ---- Divider (width defaults to the banner width) ----
 ui_divider() {
-    printf '  %s%s%s\n' "${PIKA_CYAN}" '──────────────────────────────────────────────────────────' "${PIKA_NC}"
+    local w="${1:-58}"
+    case "$w" in ''|*[!0-9]*) w=58 ;; esac
+    printf '  %s%s%s\n' "${PIKA_CYAN}" "$(_ui_repeat_char '─' "$w")" "${PIKA_NC}"
 }
 
 # ---- System info block (compact neofetch-lite) ----
@@ -249,6 +261,7 @@ _UI_NUM_COL=4
 _UI_GAP=2
 _UI_NAME_COL=12
 _UI_DESC_COL=38
+_UI_ROW_W=60
 
 ui_item() {
     local num="$1" name="$2" desc="${3:-}"
@@ -267,12 +280,49 @@ ui_item() {
 #  Usage: ui_menu "TITLE" "MENU_ARRAY_NAME" ["BACK_LABEL"]
 #  Array entries: "key|title_i18n_key|desc_i18n_key|handler"
 # ============================================================
+# Size the columns from one menu's own content so nothing gets cut off
+# ("安装 NetPanel" must stay readable).  Titles always win: if the menu would
+# be wider than the terminal, only the description column is shortened.
+# Sets: _UI_NAME_COL, _UI_DESC_COL, _UI_ROW_W (total columns incl. 2-space indent).
+ui_menu_size() {
+    local array_name="$1" back_label="${2:-}"
+    local -n _ui_entries="$array_name"
+
+    local entry key title_key desc_key handler nw dw name_col=12 desc_col=38
+    for entry in "${_ui_entries[@]}"; do
+        IFS='|' read -r key title_key desc_key handler <<< "$entry"
+        nw=$(_ui_str_width "$(t "$title_key")")
+        dw=$(_ui_str_width "$(t "$desc_key")")
+        [ "$nw" -gt "$name_col" ] && name_col=$nw
+        [ "$dw" -gt "$desc_col" ] && desc_col=$dw
+    done
+    if [ -n "$back_label" ]; then
+        nw=$(_ui_str_width "$back_label")
+        [ "$nw" -gt "$name_col" ] && name_col=$nw
+    fi
+
+    local fixed=$((2 + _UI_NUM_COL + _UI_GAP + name_col + _UI_GAP))
+    local avail; avail=$(_pika_term_width)
+    if [ "$avail" -gt "$fixed" ] && [ $((fixed + desc_col)) -gt "$avail" ]; then
+        desc_col=$((avail - fixed))
+    fi
+    [ "$desc_col" -lt 10 ] && desc_col=10
+
+    _UI_NAME_COL="$name_col"
+    _UI_DESC_COL="$desc_col"
+    _UI_ROW_W=$((fixed + desc_col))
+}
+
 ui_menu() {
     local title="$1" array_name="$2" back_label="${3:-}"
     local -n entries="$array_name"
 
+    ui_menu_size "$array_name" "$back_label"
+    local row_w="$_UI_ROW_W"
+
+    ui_divider "$((row_w - 2))"
     ui_section "$title"
-    local idx=1 entry key title_key desc_key handler
+    local idx=1
     for entry in "${entries[@]}"; do
         IFS='|' read -r key title_key desc_key handler <<< "$entry"
         ui_item "$idx" "$(t "$title_key")" "$(t "$desc_key")"
@@ -282,7 +332,7 @@ ui_menu() {
     [ -n "$back_label" ] && ui_item "0" "$back_label" ""
 
     printf '\n'
-    ui_divider
+    ui_divider "$((row_w - 2))"
     printf '  %s ' "$(t 'menu.prompt')"
 }
 
