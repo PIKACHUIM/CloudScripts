@@ -44,6 +44,7 @@ CaddyMENU=(
 CaddySitesMENU=(
     "list|caddy.site.list|caddy.site.list.desc|do_caddy_site_list"
     "add|caddy.site.add|caddy.site.add.desc|do_caddy_site_add"
+    "edit|caddy.site.edit|caddy.site.edit.desc|do_caddy_site_edit"
     "del|caddy.site.del|caddy.site.del.desc|do_caddy_site_del"
 )
 
@@ -456,18 +457,21 @@ _caddy_print_sites() {
         pika_info "$(t 'caddy.site.none')"
         return 1
     fi
-    printf '\n  %-4s %s %s %s\n' \
+    printf '\n  %-4s %s %s %s %s\n' \
         "#" \
-        "$(_ui_str_pad "$(t 'caddy.site.domains')" 30)" \
-        "$(_ui_str_pad "$(t 'caddy.site.upstream')" 34)" \
-        "$(t 'caddy.site.tls')"
-    local i=1 id d u m
+        "$(_ui_str_pad "$(t 'caddy.site.domains')" 26)" \
+        "$(_ui_str_pad "$(t 'caddy.site.upstream')" 26)" \
+        "$(_ui_str_pad "$(t 'caddy.site.tls')" 10)" \
+        "$(t 'site.port')"
+    local i=1 id d u m p
     for id in "${CADDY_SITE_IDS[@]}"; do
         d=$(_caddy_meta_get "$id" "domains" 2>/dev/null || true)
         u=$(_caddy_meta_get "$id" "upstreams" 2>/dev/null || true)
         m=$(_caddy_meta_get "$id" "tls_mode" 2>/dev/null || true)
-        printf '  %-4s %s %s %s\n' \
-            "[$i]" "$(_ui_str_pad "$d" 30)" "$(_ui_str_pad "$u" 34)" "${m:-auto}"
+        p=$(_caddy_meta_get "$id" "port" 2>/dev/null || true)
+        printf '  %-4s %s %s %s %s\n' \
+            "[$i]" "$(_ui_str_pad "$d" 26)" "$(_ui_str_pad "$u" 26)" \
+            "$(_ui_str_pad "${m:-auto}" 10)" "${p:-$(t 'site.port.default')}"
         i=$((i + 1))
     done
     return 0
@@ -491,22 +495,27 @@ _caddy_pick_site() {
 # ============================================================
 _caddy_render_site() {
     local id="$1"
-    local domains upstreams tls_mode cert key extra addrs upstream_list d u
+    local domains upstreams tls_mode cert key extra port addrs upstream_list d u host
     domains=$(_caddy_meta_get "$id" "domains" 2>/dev/null || true)
     upstreams=$(_caddy_meta_get "$id" "upstreams" 2>/dev/null || true)
     tls_mode=$(_caddy_meta_get "$id" "tls_mode" 2>/dev/null || true)
     cert=$(_caddy_meta_get "$id" "cert" 2>/dev/null || true)
     key=$(_caddy_meta_get "$id" "key" 2>/dev/null || true)
     extra=$(_caddy_meta_get "$id" "extra" 2>/dev/null || true)
+    port=$(_caddy_meta_get "$id" "port" 2>/dev/null || true)
 
     addrs=""
     local _ng=0
     case $- in *f*) _ng=1 ;; *) set -f ;; esac
     for d in $(printf '%s' "$domains" | tr ',' ' '); do
+        host="$d"
+        [ -n "$port" ] && host="${d}:${port}"
         if [ "$tls_mode" = "off" ]; then
-            addrs="${addrs}${addrs:+, }http://${d}"
+            addrs="${addrs}${addrs:+, }http://${host}"
+        elif [ -n "$port" ]; then
+            addrs="${addrs}${addrs:+, }https://${host}"
         else
-            addrs="${addrs}${addrs:+, }${d}"
+            addrs="${addrs}${addrs:+, }${host}"
         fi
     done
     [ "$_ng" = "1" ] || set +f
@@ -567,6 +576,27 @@ _caddy_clean_domains() {
     printf '%s' "$out"
 }
 
+# ---- Normalise a listen port: empty/0 => default 80/443 ----
+_caddy_clean_port() {
+    local p
+    p=$(printf '%s' "${1:-}" | tr -d ' \t')
+    case "$p" in
+        ''|0|:0) return 0 ;;
+    esac
+    p="${p#:}"
+    p="${p#*:}"
+    case "$p" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    [ "$p" -ge 1 ] && [ "$p" -le 65535 ] || return 1
+    printf '%s' "$p"
+}
+
+# ---- A TLS site cannot listen on 80 (that is the plain-HTTP port) ----
+_caddy_port_tls_conflict() {
+    [ "${1:-}" = "80" ] && [ "${2:-off}" != "off" ]
+}
+
 do_caddy_site_add() {
     _caddy_require || return 1
     _caddy_ensure_dirs
@@ -619,6 +649,18 @@ do_caddy_site_add() {
 
     read -r -p "  $(t 'caddy.site.extra'): " extra || extra=""
 
+    local port_in port=""
+    printf '  %s (%s)\n' "$(t 'site.port')" "$(t 'site.port.hint')"
+    read -r -p "  $(t 'site.port') [default]: " port_in || port_in=""
+    if ! port=$(_caddy_clean_port "$port_in"); then
+        pika_err "$(t 'site.port.invalid')"
+        return 1
+    fi
+    if _caddy_port_tls_conflict "$port" "$tls_mode"; then
+        pika_err "$(t 'site.port.tls80')"
+        return 1
+    fi
+
     id=$(_caddy_slug "${domains%%,*}")
     if [ -f "$(_caddy_meta_path "$id")" ]; then
         pika_err "$(t 'caddy.site.exists'): $id"
@@ -630,6 +672,7 @@ do_caddy_site_add() {
     _caddy_meta_set "$id" "upstreams" "$upstream"
     _caddy_meta_set "$id" "tls_mode" "$tls_mode"
     _caddy_meta_set "$id" "extra" "$extra"
+    _caddy_meta_set "$id" "port" "$port"
     _caddy_meta_set "$id" "created" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     if [ -n "$cert_id" ]; then
         _caddy_meta_set "$id" "cert" "${CADDY_CERT_DIR}/${cert_id}/cert.pem"
@@ -654,6 +697,141 @@ do_caddy_site_list() {
     _caddy_require || return 1
     _caddy_print_sites || return 0
     printf '\n  %s: %s\n' "$(t 'caddy.site.dir')" "$CADDY_SITE_DIR"
+    return 0
+}
+
+# ---- Edit an existing site: domains, upstream, TLS mode, extra, port ----
+do_caddy_site_edit() {
+    _caddy_require || return 1
+    _caddy_collect_sites || { pika_info "$(t 'caddy.site.none')"; return 0; }
+
+    local id cur_d cur_u cur_tls cur_extra cur_cert cur_key cur_port
+    id=$(_caddy_pick_site) || { pika_info "$(t 'ui.cancelled')"; return 0; }
+    cur_d=$(_caddy_meta_get "$id" "domains" 2>/dev/null || true)
+    cur_u=$(_caddy_meta_get "$id" "upstreams" 2>/dev/null || true)
+    cur_tls=$(_caddy_meta_get "$id" "tls_mode" 2>/dev/null || true)
+    cur_extra=$(_caddy_meta_get "$id" "extra" 2>/dev/null || true)
+    cur_cert=$(_caddy_meta_get "$id" "cert" 2>/dev/null || true)
+    cur_key=$(_caddy_meta_get "$id" "key" 2>/dev/null || true)
+    cur_port=$(_caddy_meta_get "$id" "port" 2>/dev/null || true)
+
+    printf '\n'
+    printf '  %s: %s\n' "$(t 'caddy.site.domains')" "$cur_d"
+    printf '  %s: %s\n' "$(t 'caddy.site.upstream')" "$cur_u"
+    printf '  %s: %s\n' "$(t 'caddy.site.tls')" "${cur_tls:-auto}"
+    printf '  %s: %s\n' "$(t 'site.port')" "${cur_port:-$(t 'site.port.default')}"
+    printf '  %s\n\n' "$(t 'site.keep')"
+
+    local domains_raw domains upstreams tls_choice tls_mode cert_id cert key extra extra_in port_in port tls_cur
+
+    read -r -p "  $(t 'caddy.site.domain') [${cur_d}]: " domains_raw || return 1
+    domains_raw="${domains_raw:-$cur_d}"
+    if ! domains=$(_caddy_clean_domains "$domains_raw"); then
+        pika_err "$(t 'caddy.site.invalid')"
+        return 1
+    fi
+
+    read -r -p "  $(t 'caddy.site.upstream') [${cur_u}]: " upstreams || return 1
+    upstreams="${upstreams:-$cur_u}"
+    upstreams=$(printf '%s' "$upstreams" | tr ',' ' ' | tr -s ' ' ',')
+    upstreams="${upstreams#,}"
+    upstreams="${upstreams%,}"
+
+    printf '\n  1) %s\n  2) %s\n  3) %s\n  4) %s\n' \
+        "$(t 'caddy.tls.auto')" "$(t 'caddy.tls.manual')" \
+        "$(t 'caddy.tls.internal')" "$(t 'caddy.tls.off')"
+    tls_cur=1
+    case "$cur_tls" in
+        manual)   tls_cur=2 ;;
+        internal) tls_cur=3 ;;
+        off)      tls_cur=4 ;;
+    esac
+    read -r -p "  $(t 'caddy.site.tls') [1-4, ${tls_cur}]: " tls_choice || return 1
+    tls_choice="${tls_choice:-$tls_cur}"
+
+    tls_mode="auto"
+    cert=""
+    key=""
+    cert_id=""
+    case "$tls_choice" in
+        2)
+            tls_mode="manual"
+            if [ "$cur_tls" = "manual" ] && [ -f "${cur_cert:-/nonexistent}" ] && [ -f "${cur_key:-/nonexistent}" ]; then
+                cert="$cur_cert"
+                key="$cur_key"
+            elif _caddy_collect_certs; then
+                if ! cert_id=$(_caddy_pick_cert); then
+                    pika_info "$(t 'ui.cancelled')"
+                    return 0
+                fi
+                cert="${CADDY_CERT_DIR}/${cert_id}/cert.pem"
+                key="${CADDY_CERT_DIR}/${cert_id}/key.pem"
+            else
+                pika_info "$(t 'caddy.cert.none')"
+                if ! cert_id=$(_caddy_cert_import_flow); then
+                    pika_info "$(t 'ui.cancelled')"
+                    return 0
+                fi
+                cert="${CADDY_CERT_DIR}/${cert_id}/cert.pem"
+                key="${CADDY_CERT_DIR}/${cert_id}/key.pem"
+            fi
+            ;;
+        3) tls_mode="internal" ;;
+        4) tls_mode="off" ;;
+        *) tls_mode="auto" ;;
+    esac
+
+    read -r -p "  $(t 'caddy.site.extra') [${cur_extra:-none}]: " extra_in || extra_in=""
+    case "$extra_in" in
+        '')  extra="$cur_extra" ;;
+        '-') extra="" ;;
+        *)   extra="$extra_in" ;;
+    esac
+
+    read -r -p "  $(t 'site.port') [${cur_port:-$(t 'site.port.default')}]: " port_in || port_in=""
+    case "$port_in" in
+        '') port="$cur_port" ;;
+        '-') port="" ;;
+        *)
+            if ! port=$(_caddy_clean_port "$port_in"); then
+                pika_err "$(t 'site.port.invalid')"
+                return 1
+            fi
+            ;;
+    esac
+    if _caddy_port_tls_conflict "$port" "$tls_mode"; then
+        pika_err "$(t 'site.port.tls80')"
+        return 1
+    fi
+
+    # An invalid config must not destroy the existing site: keep the meta around.
+    local meta_file meta_bak
+    meta_file=$(_caddy_meta_path "$id")
+    meta_bak="${meta_file}.edit.bak"
+    cp -f "$meta_file" "$meta_bak" 2>/dev/null || true
+
+    _caddy_meta_set "$id" "domains" "$domains"
+    _caddy_meta_set "$id" "upstreams" "$upstreams"
+    _caddy_meta_set "$id" "tls_mode" "$tls_mode"
+    _caddy_meta_set "$id" "extra" "$extra"
+    _caddy_meta_set "$id" "port" "$port"
+    if [ -n "$cert" ]; then
+        _caddy_meta_set "$id" "cert" "$cert"
+        _caddy_meta_set "$id" "key" "$key"
+    fi
+    _caddy_render_site "$id"
+
+    if ! _caddy_apply; then
+        if [ -f "$meta_bak" ]; then
+            mv -f "$meta_bak" "$meta_file"
+        fi
+        _caddy_render_site "$id"
+        _caddy_apply >/dev/null 2>&1 || true
+        pika_err "$(t 'site.update.failed')"
+        return 1
+    fi
+    rm -f "$meta_bak"
+    pika_info "$(t 'site.updated'): $domains"
     return 0
 }
 

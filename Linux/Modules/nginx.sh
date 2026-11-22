@@ -50,6 +50,7 @@ NginxMENU=(
 NginxSitesMENU=(
     "list|nginx.site.list|nginx.site.list.desc|do_nginx_site_list"
     "add|nginx.site.add|nginx.site.add.desc|do_nginx_site_add"
+    "edit|nginx.site.edit|nginx.site.edit.desc|do_nginx_site_edit"
     "del|nginx.site.del|nginx.site.del.desc|do_nginx_site_del"
 )
 
@@ -261,13 +262,14 @@ _nginx_proxy_location() {
 
 _nginx_render_site() {
     local id="$1"
-    local domains upstreams tls_mode cert key extra d u upname server_names
+    local domains upstreams tls_mode cert key extra port d u upname server_names
     domains=$(_nginx_meta_get "$id" "domains" 2>/dev/null || true)
     upstreams=$(_nginx_meta_get "$id" "upstreams" 2>/dev/null || true)
     tls_mode=$(_nginx_meta_get "$id" "tls_mode" 2>/dev/null || true)
     cert=$(_nginx_meta_get "$id" "cert" 2>/dev/null || true)
     key=$(_nginx_meta_get "$id" "key" 2>/dev/null || true)
     extra=$(_nginx_meta_get "$id" "extra" 2>/dev/null || true)
+    port=$(_nginx_meta_get "$id" "port" 2>/dev/null || true)
     upname=$(_nginx_upstream_name "$id")
 
     server_names=""
@@ -292,26 +294,40 @@ _nginx_render_site() {
         esac
     fi
 
-    # ---- port 80 ----
-    printf 'server {\n'
-    printf '    listen 80;\n'
-    printf '    server_name%s;\n' "$server_names"
-    printf '    location ^~ /.well-known/acme-challenge/ {\n'
-    printf '        root %s;\n' "$NGINX_ACME_WEBROOT"
-    printf '    }\n'
+    # ---- plain HTTP ----
+    # With TLS and the default ports this block only does ACME + redirect.
+    # With a custom port there is no :80 block at all, so moving the site to
+    # e.g. 8443 never fights with whatever already owns port 80.
     if [ "$use_tls" = "1" ]; then
-        printf '    location / {\n'
-        printf '        return 301 https://$host$request_uri;\n'
-        printf '    }\n'
+        if [ -z "$port" ]; then
+            printf 'server {\n'
+            printf '    listen 80;\n'
+            printf '    server_name%s;\n' "$server_names"
+            printf '    location ^~ /.well-known/acme-challenge/ {\n'
+            printf '        root %s;\n' "$NGINX_ACME_WEBROOT"
+            printf '    }\n'
+            printf '    location / {\n'
+            printf '        return 301 https://$host$request_uri;\n'
+            printf '    }\n'
+            printf '}\n\n'
+        fi
     else
+        printf 'server {\n'
+        printf '    listen %s;\n' "${port:-80}"
+        printf '    server_name%s;\n' "$server_names"
+        if [ -z "$port" ]; then
+            printf '    location ^~ /.well-known/acme-challenge/ {\n'
+            printf '        root %s;\n' "$NGINX_ACME_WEBROOT"
+            printf '    }\n'
+        fi
         _nginx_proxy_location "$upname" "$extra"
+        printf '}\n\n'
     fi
-    printf '}\n\n'
 
-    # ---- port 443 ----
+    # ---- HTTPS ----
     if [ "$use_tls" = "1" ]; then
         printf 'server {\n'
-        printf '    listen 443 ssl;\n'
+        printf '    listen %s ssl;\n' "${port:-443}"
         printf '    server_name%s;\n' "$server_names"
         printf '    ssl_certificate %s;\n' "$cert"
         printf '    ssl_certificate_key %s;\n' "$key"
@@ -459,18 +475,21 @@ _nginx_print_sites() {
         pika_info "$(t 'nginx.site.none')"
         return 1
     fi
-    printf '\n  %-4s %s %s %s\n' \
+    printf '\n  %-4s %s %s %s %s\n' \
         "#" \
-        "$(_ui_str_pad "$(t 'nginx.site.domains')" 30)" \
-        "$(_ui_str_pad "$(t 'nginx.site.upstream')" 34)" \
-        "$(t 'nginx.site.tls')"
-    local i=1 id d u m
+        "$(_ui_str_pad "$(t 'nginx.site.domains')" 26)" \
+        "$(_ui_str_pad "$(t 'nginx.site.upstream')" 26)" \
+        "$(_ui_str_pad "$(t 'nginx.site.tls')" 10)" \
+        "$(t 'site.port')"
+    local i=1 id d u m p
     for id in "${NGINX_SITE_IDS[@]}"; do
         d=$(_nginx_meta_get "$id" "domains" 2>/dev/null || true)
         u=$(_nginx_meta_get "$id" "upstreams" 2>/dev/null || true)
         m=$(_nginx_meta_get "$id" "tls_mode" 2>/dev/null || true)
-        printf '  %-4s %s %s %s\n' \
-            "[$i]" "$(_ui_str_pad "$d" 30)" "$(_ui_str_pad "$u" 34)" "${m:-off}"
+        p=$(_nginx_meta_get "$id" "port" 2>/dev/null || true)
+        printf '  %-4s %s %s %s %s\n' \
+            "[$i]" "$(_ui_str_pad "$d" 26)" "$(_ui_str_pad "$u" 26)" \
+            "$(_ui_str_pad "${m:-off}" 10)" "${p:-$(t 'site.port.default')}"
         i=$((i + 1))
     done
     return 0
@@ -535,6 +554,32 @@ _nginx_clean_upstreams() {
     done
     [ -n "$out" ] || return 1
     printf '%s' "$out"
+}
+
+# ---- Normalise a listen port: empty/0 => default 80/443 ----
+_nginx_clean_port() {
+    local p
+    p=$(printf '%s' "${1:-}" | tr -d ' \t')
+    case "$p" in
+        ''|0|:0) return 0 ;;
+    esac
+    p="${p#:}"
+    p="${p#*:}"
+    case "$p" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    [ "$p" -ge 1 ] && [ "$p" -le 65535 ] || return 1
+    printf '%s' "$p"
+}
+
+# ---- TLS cannot listen on 80 ----
+_nginx_port_tls_conflict() {
+    [ "${1:-}" = "80" ] && [ "${2:-off}" != "off" ]
+}
+
+# ---- Automatic certificates use HTTP-01 on port 80 ----
+_nginx_port_acme_conflict() {
+    [ -n "${1:-}" ] && [ "${2:-off}" = "auto" ]
 }
 
 _nginx_selfsigned() {
@@ -643,6 +688,22 @@ do_nginx_site_add() {
 
     read -r -p "  $(t 'nginx.site.extra'): " extra || extra=""
 
+    local port_in port=""
+    printf '  %s (%s)\n' "$(t 'site.port')" "$(t 'site.port.hint')"
+    read -r -p "  $(t 'site.port') [default]: " port_in || port_in=""
+    if ! port=$(_nginx_clean_port "$port_in"); then
+        pika_err "$(t 'site.port.invalid')"
+        return 1
+    fi
+    if _nginx_port_tls_conflict "$port" "$tls_mode"; then
+        pika_err "$(t 'site.port.tls80')"
+        return 1
+    fi
+    if _nginx_port_acme_conflict "$port" "$tls_mode"; then
+        pika_err "$(t 'site.port.acme')"
+        return 1
+    fi
+
     id=$(_nginx_slug "${domains%%,*}")
     if [ -f "$(_nginx_meta_path "$id")" ]; then
         pika_err "$(t 'nginx.site.exists'): $id"
@@ -663,6 +724,7 @@ do_nginx_site_add() {
     _nginx_meta_set "$id" "upstreams" "$upstreams"
     _nginx_meta_set "$id" "tls_mode" "$tls_mode"
     _nginx_meta_set "$id" "extra" "$extra"
+    _nginx_meta_set "$id" "port" "$port"
     _nginx_meta_set "$id" "created" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     if [ -n "$cert_id" ]; then
         _nginx_meta_set "$id" "cert" "${NGINX_CERT_DIR}/${cert_id}/cert.pem"
@@ -697,6 +759,178 @@ do_nginx_site_list() {
     _nginx_require || return 1
     _nginx_print_sites || return 0
     printf '\n  %s: %s\n' "$(t 'nginx.site.dir')" "$NGINX_SITE_CONF"
+    return 0
+}
+
+# ---- Edit an existing site: domains, upstream, TLS mode, extra, port ----
+do_nginx_site_edit() {
+    _nginx_require || return 1
+    _nginx_ensure_dirs
+    _nginx_ensure_include || true
+    _nginx_collect_sites || { pika_info "$(t 'nginx.site.none')"; return 0; }
+
+    local id cur_d cur_u cur_tls cur_extra cur_cert cur_port
+    id=$(_nginx_pick_site) || { pika_info "$(t 'ui.cancelled')"; return 0; }
+    cur_d=$(_nginx_meta_get "$id" "domains" 2>/dev/null || true)
+    cur_u=$(_nginx_meta_get "$id" "upstreams" 2>/dev/null || true)
+    cur_tls=$(_nginx_meta_get "$id" "tls_mode" 2>/dev/null || true)
+    cur_extra=$(_nginx_meta_get "$id" "extra" 2>/dev/null || true)
+    cur_cert=$(_nginx_meta_get "$id" "cert" 2>/dev/null || true)
+    cur_port=$(_nginx_meta_get "$id" "port" 2>/dev/null || true)
+
+    printf '\n'
+    printf '  %s: %s\n' "$(t 'nginx.site.domains')" "$cur_d"
+    printf '  %s: %s\n' "$(t 'nginx.site.upstream')" "$cur_u"
+    printf '  %s: %s\n' "$(t 'nginx.site.tls')" "${cur_tls:-off}"
+    printf '  %s: %s\n' "$(t 'site.port')" "${cur_port:-$(t 'site.port.default')}"
+    printf '  %s\n\n' "$(t 'site.keep')"
+
+    local domains_raw domains upstreams tls_choice tls_mode cert_id extra extra_in port_in port tls_cur email
+
+    read -r -p "  $(t 'nginx.site.domain') [${cur_d}]: " domains_raw || return 1
+    domains_raw="${domains_raw:-$cur_d}"
+    if ! domains=$(_nginx_clean_domains "$domains_raw"); then
+        pika_err "$(t 'nginx.site.invalid')"
+        return 1
+    fi
+
+    read -r -p "  $(t 'nginx.site.upstream') [${cur_u}]: " upstreams || return 1
+    upstreams="${upstreams:-$cur_u}"
+    if ! upstreams=$(_nginx_clean_upstreams "$upstreams"); then
+        pika_err "$(t 'nginx.site.invalid')"
+        return 1
+    fi
+
+    printf '\n  1) %s\n  2) %s\n  3) %s\n  4) %s\n' \
+        "$(t 'nginx.tls.auto')" "$(t 'nginx.tls.manual')" \
+        "$(t 'nginx.tls.internal')" "$(t 'nginx.tls.off')"
+    tls_cur=4
+    case "$cur_tls" in
+        auto)     tls_cur=1 ;;
+        manual)   tls_cur=2 ;;
+        internal) tls_cur=3 ;;
+        off)      tls_cur=4 ;;
+    esac
+    read -r -p "  $(t 'nginx.site.tls') [1-4, ${tls_cur}]: " tls_choice || return 1
+    tls_choice="${tls_choice:-$tls_cur}"
+
+    tls_mode="off"
+    cert_id=""
+    case "$tls_choice" in
+        1)
+            case "$domains" in
+                *\**)
+                    pika_err "$(t 'nginx.tls.auto.wildcard')"
+                    return 1
+                    ;;
+            esac
+            tls_mode="auto"
+            ;;
+        2)
+            tls_mode="manual"
+            if [ "$cur_tls" = "manual" ] && [ -f "${cur_cert:-/nonexistent}" ]; then
+                : # keep the current certificate
+            elif _nginx_collect_certs; then
+                if ! cert_id=$(_nginx_pick_cert); then
+                    pika_info "$(t 'ui.cancelled')"
+                    return 0
+                fi
+            else
+                pika_info "$(t 'nginx.cert.none')"
+                if ! cert_id=$(_nginx_cert_import_flow); then
+                    pika_info "$(t 'ui.cancelled')"
+                    return 0
+                fi
+            fi
+            ;;
+        3) tls_mode="internal" ;;
+        *) tls_mode="off" ;;
+    esac
+
+    read -r -p "  $(t 'nginx.site.extra') [${cur_extra:-none}]: " extra_in || extra_in=""
+    case "$extra_in" in
+        '')  extra="$cur_extra" ;;
+        '-') extra="" ;;
+        *)   extra="$extra_in" ;;
+    esac
+
+    read -r -p "  $(t 'site.port') [${cur_port:-$(t 'site.port.default')}]: " port_in || port_in=""
+    case "$port_in" in
+        '') port="$cur_port" ;;
+        '-') port="" ;;
+        *)
+            if ! port=$(_nginx_clean_port "$port_in"); then
+                pika_err "$(t 'site.port.invalid')"
+                return 1
+            fi
+            ;;
+    esac
+    if _nginx_port_tls_conflict "$port" "$tls_mode"; then
+        pika_err "$(t 'site.port.tls80')"
+        return 1
+    fi
+    if _nginx_port_acme_conflict "$port" "$tls_mode"; then
+        pika_err "$(t 'site.port.acme')"
+        return 1
+    fi
+
+    if [ "$tls_mode" = "manual" ] && [ -z "$cert_id" ] && [ ! -f "${cur_cert:-/nonexistent}" ]; then
+        pika_err "$(t 'nginx.cert.none')"
+        return 1
+    fi
+
+    if [ "$tls_mode" = "internal" ]; then
+        if ! _nginx_selfsigned "$id" "$domains"; then
+            pika_err "$(t 'nginx.tls.internal.failed')"
+            return 1
+        fi
+        tls_mode="manual"
+        cert_id="$id"
+    fi
+
+    # An invalid config must not destroy the existing site: keep the meta around.
+    local meta_file meta_bak
+    meta_file=$(_nginx_meta_path "$id")
+    meta_bak="${meta_file}.edit.bak"
+    cp -f "$meta_file" "$meta_bak" 2>/dev/null || true
+
+    _nginx_meta_set "$id" "domains" "$domains"
+    _nginx_meta_set "$id" "upstreams" "$upstreams"
+    _nginx_meta_set "$id" "tls_mode" "$tls_mode"
+    _nginx_meta_set "$id" "extra" "$extra"
+    _nginx_meta_set "$id" "port" "$port"
+    if [ -n "$cert_id" ]; then
+        _nginx_meta_set "$id" "cert" "${NGINX_CERT_DIR}/${cert_id}/cert.pem"
+        _nginx_meta_set "$id" "key" "${NGINX_CERT_DIR}/${cert_id}/key.pem"
+    fi
+
+    _nginx_render_all
+    if ! _nginx_apply; then
+        if [ -f "$meta_bak" ]; then
+            mv -f "$meta_bak" "$meta_file"
+        fi
+        _nginx_render_all
+        _nginx_apply >/dev/null 2>&1 || true
+        pika_err "$(t 'site.update.failed')"
+        return 1
+    fi
+    rm -f "$meta_bak"
+
+    # Renew the certificate when the domain list changed (auto mode only)
+    if [ "$tls_mode" = "auto" ] && { [ "$domains" != "$cur_d" ] || [ ! -f "${cur_cert:-/nonexistent}" ]; }; then
+        if email=$(_nginx_auto_email 2>/dev/null); then
+            if _nginx_acme_auto "$id" "$domains" "$email"; then
+                pika_info "$(t 'nginx.auto.success')"
+            else
+                pika_warn "$(t 'nginx.auto.failed')"
+                _nginx_meta_set "$id" "tls_mode" "off"
+                _nginx_render_all
+                _nginx_apply >/dev/null 2>&1 || true
+            fi
+        fi
+    fi
+
+    pika_info "$(t 'site.updated'): $domains"
     return 0
 }
 
