@@ -163,8 +163,9 @@ do_sys_update() {
 
 # ---- Mainland acceleration console ----
 do_sys_accel() {
-    local sel cur mode
+    local sel cur mode need_pause
     while true; do
+        need_pause=0
         mode=$(pika_config_get "accel" 2>/dev/null || true)
         cur=""
         if [ -f "$PIKA_GH_CACHE" ]; then
@@ -192,10 +193,11 @@ do_sys_accel() {
         fi
         echo "  0) $(t 'menu.back')"
         echo ""
-        read -r -p "  $(t 'accel.prompt'): " sel
+        read -r -p "  $(t 'accel.prompt'): " sel || return
+
+        if ui_is_back "$sel"; then return; fi
 
         case "$sel" in
-            0|b|B|q|Q) return ;;
             1)
                 pika_info "$(t 'accel.probing')"
                 local p
@@ -204,6 +206,7 @@ do_sys_accel() {
                     pika_info "$(t 'accel.found'): $p"
                 else
                     pika_warn "$(t 'accel.none')"
+                    need_pause=1
                 fi
                 ;;
             2)
@@ -211,6 +214,7 @@ do_sys_accel() {
                     pika_info "$(t 'accel.done')"
                 else
                     pika_err "$(t 'accel.failed')"
+                    need_pause=1
                 fi
                 ;;
             3)
@@ -219,6 +223,7 @@ do_sys_accel() {
                     pika_info "$(t 'accel.done')"
                 else
                     pika_err "$(t 'accel.failed')"
+                    need_pause=1
                 fi
                 ;;
             4)
@@ -233,11 +238,16 @@ do_sys_accel() {
                     pika_info "$(t 'accel.status.off')"
                 fi
                 ;;
-            *) pika_warn "$(t 'ui.invalid'): $sel" ;;
+            *)
+                pika_warn "$(t 'ui.invalid'): $sel"
+                need_pause=1
+                ;;
         esac
-        echo ""
-        printf "  $(t 'ui.press_enter') "
-        read -r
+        if [ "$need_pause" = "1" ]; then
+            echo ""
+            printf "  $(t 'ui.press_enter') "
+            read -r
+        fi
     done
 }
 

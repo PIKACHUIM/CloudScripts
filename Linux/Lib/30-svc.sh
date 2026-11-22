@@ -181,6 +181,26 @@ _svc_nohup_stop() {
 #  Unified service management
 # ============================================================
 
+# ---- Is the service actually registered with the active backend? ----
+svc_registered() {
+    local name="$1"; [ -z "$name" ] && return 1
+    local backend; backend=$(svc_backend)
+    case "$backend" in
+        systemd)
+            [ -f "/etc/systemd/system/${name}.service" ] \
+                || [ -f "/lib/systemd/system/${name}.service" ] \
+                || [ -f "/usr/lib/systemd/system/${name}.service" ]
+            ;;
+        pm2)
+            pm2 describe "$name" >/dev/null 2>&1
+            ;;
+        nohup)
+            [ -f "$(_svc_nohup_dir)/${name}.cmd" ]
+            ;;
+        *) return 1 ;;
+    esac
+}
+
 # ---- Register/install a service ----
 # Usage: svc_register --name NAME --exec "cmd args" [--workdir DIR] [--env "K=V"] [--autostart] [--desc "Description"]
 svc_register() {

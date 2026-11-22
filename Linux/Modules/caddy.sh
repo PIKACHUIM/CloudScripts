@@ -235,6 +235,30 @@ _caddy_validate() {
     return 1
 }
 
+# ---- Self-heal: the recorded service name may have no unit/process at all ----
+# Older builds never registered a unit, so the name file can point at a
+# service that does not exist ("Unit caddy.service not found").
+_caddy_ensure_service() {
+    _caddy_require || return 1
+    local name
+    name=$(_caddy_svc_name)
+    if svc_registered "$name"; then
+        return 0
+    fi
+    pika_warn "$(t 'caddy.service.missing'): $name"
+    _caddy_ensure_dirs
+    _caddy_write_wrapper
+    [ -f "$CADDY_MAIN_CONF" ] || _caddy_write_master
+    [ -f "$CADDY_SVC_NAME_FILE" ] || _caddy_set_svc_name "$name"
+    if ! svc_register --name "$name" --exec "$CADDY_WRAPPER" --workdir "/etc/caddy" \
+        --autostart --desc "Caddy Web Server (PIKA SH)"; then
+        pika_err "$(t 'caddy.install.failed')"
+        return 1
+    fi
+    pika_info "$(t 'caddy.service.registered'): $name"
+    return 0
+}
+
 # ---- Why is it not running? Show config/log/port evidence ----
 _caddy_fail_hint() {
     local name vout busy
@@ -266,6 +290,7 @@ _caddy_fail_hint() {
 
 _caddy_apply() {
     _caddy_validate || return 1
+    _caddy_ensure_service || return 1
     if _caddy_running; then
         if ! "$CADDY_BIN" reload --config "$CADDY_MAIN_CONF" --adapter caddyfile 2>&1; then
             pika_warn "$(t 'caddy.reload.failed')"
@@ -1031,12 +1056,16 @@ do_caddy_status() {
     printf '  %s: %s\n' "$(t 'caddy.service.certs')" "$certs"
     printf '  %s: %s\n' "$(t 'caddy.service.config')" "$CADDY_MAIN_CONF"
     printf '  %s: %s\n' "$(t 'caddy.service.admin')" "http://localhost:2019/config/"
+    if ! svc_registered "$name"; then
+        pika_warn "$(t 'caddy.service.missing'): $name"
+    fi
     printf '\n'
     return 0
 }
 
 do_caddy_start() {
     _caddy_require || return 1
+    _caddy_ensure_service || return 1
     svc_start "$(_caddy_svc_name)" || true
     sleep 1
     if _caddy_running; then
@@ -1056,6 +1085,7 @@ do_caddy_stop() {
 
 do_caddy_restart() {
     _caddy_require || return 1
+    _caddy_ensure_service || return 1
     svc_restart "$(_caddy_svc_name)" || true
     sleep 1
     if _caddy_running; then
@@ -1077,6 +1107,7 @@ do_caddy_reload_action() {
 
 do_caddy_logs() {
     _caddy_require || return 1
+    PIKA_KEEP_SCREEN=1
     svc_logs "$(_caddy_svc_name)" 80 || true
     return 0
 }
@@ -1130,14 +1161,17 @@ _caddy_menu_loop() {
     local arr_name="$1" title_key="$2" sel rc total
     local -n _caddy_entries="$arr_name"
     while true; do
-        ui_clear
-        ui_header
+        if [ "${PIKA_KEEP_SCREEN:-0}" = "1" ]; then
+            printf '\n'
+        else
+            ui_clear
+            ui_header
+        fi
+        PIKA_KEEP_SCREEN=0
         ui_divider
         ui_menu "$(t "$title_key")" "$arr_name" "$(t 'menu.back')"
         read -r sel || return 0
-        case "$sel" in
-            0|b|B|back|BACK) return 0 ;;
-        esac
+        if ui_is_back "$sel"; then return 0; fi
         case "$sel" in
             ''|*[!0-9]*)
                 pika_warn "$(t 'ui.invalid'): $sel"
@@ -1156,9 +1190,13 @@ _caddy_menu_loop() {
         if [ "$rc" -eq 2 ]; then
             return 0
         fi
-        echo ""
-        printf '  %s ' "$(t 'ui.press_enter')"
-        read -r _ || return 0
+        # Pause only when the action failed; a successful action returns
+        # straight to the menu (logs stay on screen).
+        if [ "${PIKA_DISPATCH_RC:-0}" -ne 0 ]; then
+            PIKA_KEEP_SCREEN=1
+            printf '\n  %s ' "$(t 'ui.press_enter')"
+            read -r _ || return 0
+        fi
     done
 }
 

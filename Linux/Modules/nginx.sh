@@ -1194,6 +1194,7 @@ do_nginx_reload_action() {
 
 do_nginx_logs() {
     _nginx_require || return 1
+    PIKA_KEEP_SCREEN=1
     if [ -f /var/log/nginx/error.log ]; then
         tail -n 80 /var/log/nginx/error.log 2>/dev/null || true
     elif _nginx_has_unit; then
@@ -1260,14 +1261,17 @@ _nginx_menu_loop() {
     local arr_name="$1" title_key="$2" sel rc total
     local -n _nginx_entries="$arr_name"
     while true; do
-        ui_clear
-        ui_header
+        if [ "${PIKA_KEEP_SCREEN:-0}" = "1" ]; then
+            printf '\n'
+        else
+            ui_clear
+            ui_header
+        fi
+        PIKA_KEEP_SCREEN=0
         ui_divider
         ui_menu "$(t "$title_key")" "$arr_name" "$(t 'menu.back')"
         read -r sel || return 0
-        case "$sel" in
-            0|b|B|back|BACK) return 0 ;;
-        esac
+        if ui_is_back "$sel"; then return 0; fi
         case "$sel" in
             ''|*[!0-9]*)
                 pika_warn "$(t 'ui.invalid'): $sel"
@@ -1286,9 +1290,13 @@ _nginx_menu_loop() {
         if [ "$rc" -eq 2 ]; then
             return 0
         fi
-        echo ""
-        printf '  %s ' "$(t 'ui.press_enter')"
-        read -r _ || return 0
+        # Pause only when the action failed; a successful action returns
+        # straight to the menu (logs stay on screen).
+        if [ "${PIKA_DISPATCH_RC:-0}" -ne 0 ]; then
+            PIKA_KEEP_SCREEN=1
+            printf '\n  %s ' "$(t 'ui.press_enter')"
+            read -r _ || return 0
+        fi
     done
 }
 

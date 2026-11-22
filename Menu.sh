@@ -499,26 +499,36 @@ _menu_loop() {
     local -n items="$arr_name"
 
     while true; do
-        ui_clear
-        ui_header
+        # Keep the previous output (logs, errors) on screen when asked to.
+        if [ "${PIKA_KEEP_SCREEN:-0}" = "1" ]; then
+            printf '\n'
+        else
+            ui_clear
+            ui_header
+        fi
+        PIKA_KEEP_SCREEN=0
         ui_divider
         ui_menu "$(t "$title_key")" "$arr_name" "$(t 'menu.back')"
-        read -r sel
+        read -r sel || return 0
 
-        # Back
-        case "$sel" in
-            0|b|B|back|BACK) return ;;
-        esac
+        # Back: 0, b/back, q/quit
+        if ui_is_back "$sel"; then return 0; fi
 
-        ui_dispatch "$arr_name" "$sel"
-        local rc=$?
-
-        if [ $rc -eq 2 ]; then return; fi  # Back
-        if [ $rc -ne 0 ]; then
+        local rc=0
+        ui_dispatch "$arr_name" "$sel" || rc=$?
+        if [ "$rc" -eq 2 ]; then return 0; fi
+        if [ "$rc" -ne 0 ]; then
             pika_warn "$(t 'ui.invalid'): $sel"
+            sleep 1
+            continue
         fi
 
-        echo ""; printf "  $(t 'ui.press_enter') "; read -r
+        # Only pause when the action failed and needs attention.
+        if [ "${PIKA_DISPATCH_RC:-0}" -ne 0 ]; then
+            PIKA_KEEP_SCREEN=1
+            printf '\n  %s ' "$(t 'ui.press_enter')"
+            read -r _ || return 0
+        fi
     done
 }
 

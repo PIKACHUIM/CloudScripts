@@ -261,13 +261,27 @@ ui_menu() {
 }
 
 # ============================================================
+#  Back / quit key detection
+#  0 = back (as printed in menus), b/back and q/quit/exit also work
+# ============================================================
+ui_is_back() {
+    case "${1:-}" in
+        0|b|B|back|BACK|q|Q|quit|QUIT|exit|EXIT) return 0 ;;
+    esac
+    return 1
+}
+
+# ============================================================
 #  Dispatch menu selection
 #  Returns: 0 = handled, 1 = invalid, 2 = back
+#  PIKA_DISPATCH_RC holds the handler's exit code so the caller can
+#  decide whether the result needs attention (pause) or not.
 # ============================================================
 ui_dispatch() {
     local -n ents="$1"
     local sel="${2:-0}"
 
+    PIKA_DISPATCH_RC=0
     [ "$sel" = "0" ] && return 2
 
     local idx=1 entry key title_key desc_key handler
@@ -281,15 +295,18 @@ ui_dispatch() {
                 # already reported it, so only "back" (2) is propagated.
                 local rc=0
                 "$handler" "$key" || rc=$?
+                PIKA_DISPATCH_RC=$rc
                 [ "$rc" -eq 2 ] && return 2
                 return 0
             fi
             pika_err "$(t 'ui.nohandler'): ${handler:-N/A}"
+            PIKA_DISPATCH_RC=1
             return 1
         fi
         idx=$((idx + 1))
     done
 
+    PIKA_DISPATCH_RC=1
     return 1
 }
 
