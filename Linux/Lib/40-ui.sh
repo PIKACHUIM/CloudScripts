@@ -387,6 +387,29 @@ ui_dispatch() {
 }
 
 # ============================================================
+#  Keyword search inside a menu array
+#  Prints "<index>\t<title>" for every item whose key, title,
+#  description or handler contains the query (case-insensitive).
+#  Lets the menu loop accept "证书" instead of counting numbers.
+# ============================================================
+ui_search_items() {
+    local -n _ui_search_arr="$1"
+    local query="${2:-}" idx=1 entry key tk dk handler hay label
+    [ -n "$query" ] || return 1
+    query=$(printf '%s' "$query" | tr '[:upper:]' '[:lower:]')
+    for entry in "${_ui_search_arr[@]}"; do
+        IFS='|' read -r key tk dk handler <<< "$entry"
+        label=$(t "$tk")
+        hay=$(printf '%s %s %s %s' "$key" "$label" "$(t "$dk")" "$handler" \
+            | tr '[:upper:]' '[:lower:]')
+        case "$hay" in
+            *"$query"*) printf '%s\t%s\n' "$idx" "$label" ;;
+        esac
+        idx=$((idx + 1))
+    done
+}
+
+# ============================================================
 #  Install confirmation dialog
 #    ┌──────────────────────────────────────┐
 #    │ 即将安装: Docker CE                  │

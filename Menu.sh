@@ -20,7 +20,7 @@ if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ] || { [ "${BASH_VERSINFO[0]:-0}" -eq 4 ] &&
     exit 1
 fi
 
-PIKA_VERSION="1.5"
+PIKA_VERSION="1.6"
 PIKA_BASE="$(cd "$(dirname "$0")" && pwd)"
 PIKA_LIB_DIR="${PIKA_BASE}/Linux/Lib"
 PIKA_MOD_DIR="${PIKA_BASE}/Linux/Modules"
@@ -398,14 +398,16 @@ _load_module() {
         done
     fi
 
-    local src missing best=""
+    local src missing best="" report="" mcount
     for src in "${sources[@]}"; do
         if ! _pika_get "${src}/Linux/Modules/${mod}" "$tmpf"; then
+            report="${report}${src}|$(t 'common.module_reason_fetch')"$'\n'
             rm -f "$tmpf"
             continue
         fi
         if ! bash -n "$tmpf" 2>/dev/null; then
             pika_debug "module ${mod}: syntax error from ${src}, skipping"
+            report="${report}${src}|$(t 'common.module_reason_syntax')"$'\n'
             rm -f "$tmpf"
             continue
         fi
@@ -416,6 +418,8 @@ _load_module() {
             return
         fi
         pika_debug "module ${mod}: ${src} is out of sync (missing: ${missing})"
+        mcount=$(printf '%s' "$missing" | wc -w | tr -d ' ')
+        report="${report}${src}|$(t 'common.module_reason_stale' "$mcount" "$missing")"$'\n'
         if [ -z "$best" ]; then
             mv -f "$tmpf" "$keep"
             best="$keep"
@@ -434,7 +438,15 @@ _load_module() {
         return
     fi
 
-    pika_err "$(t 'common.error'): module $mod"
+    pika_err "$(t 'common.module_failed' "$mod")"
+    if [ -n "$report" ]; then
+        printf '  %s\n' "$(t 'common.module_tried' "$(printf '%s' "$report" | grep -c .)")"
+        printf '%s' "$report" | while IFS='|' read -r src reason; do
+            [ -n "$src" ] || continue
+            printf '  - %s\n      %s\n' "$src" "$reason"
+        done
+        printf '  %s\n' "$(t 'common.module_hint')"
+    fi
     return 1
 }
 
@@ -453,42 +465,42 @@ MENU_MAIN=(
 
 # ---- Submenu handlers (all follow pattern: load module, render, dispatch) ----
 menu_deploy() {
-    _load_module "deploy.sh" || return
+    _load_module "deploy.sh" || return 0
     _menu_loop "deploy" "DeployMENU" "menu.deploy"
 }
 
 menu_maintain() {
-    _load_module "maintain.sh" || return
+    _load_module "maintain.sh" || return 0
     _menu_loop "maintain" "MaintainMENU" "menu.maintain"
 }
 
 menu_desktop() {
-    _load_module "desktop.sh" || return
+    _load_module "desktop.sh" || return 0
     _menu_loop "desktop" "DesktopMENU" "menu.desktop"
 }
 
 menu_bench() {
-    _load_module "bench.sh" || return
+    _load_module "bench.sh" || return 0
     _menu_loop "bench" "BenchMENU" "menu.bench"
 }
 
 menu_software() {
-    _load_module "software.sh" || return
+    _load_module "software.sh" || return 0
     _menu_loop "software" "SoftwareMENU" "menu.software"
 }
 
 menu_proxy() {
-    _load_module "proxy.sh" || return
+    _load_module "proxy.sh" || return 0
     _menu_loop "proxy" "ProxyMENU" "menu.proxy"
 }
 
 menu_reverseproxy() {
-    _load_module "reverseproxy.sh" || return
+    _load_module "reverseproxy.sh" || return 0
     do_rp_enter
 }
 
 menu_system() {
-    _load_module "system.sh" || return
+    _load_module "system.sh" || return 0
     _menu_loop "system" "SystemMENU" "menu.system"
 }
 
@@ -552,12 +564,42 @@ PIKA_LAUNCHER
     fi
 }
 
+# ---- 关键词 → 菜单编号 ----
+# 数字以外的输入当作关键词，在当前菜单的标题/说明/标识里查找。
+# 命中一个直接返回编号；命中多个列出编号等待选择；无命中返回 1。
+_pika_menu_resolve() {
+    local arr_name="$1" query="$2" hits hit_n pick label
+    hits=$(ui_search_items "$arr_name" "$query")
+    if [ -z "$hits" ]; then
+        pika_warn "$(t 'ui.no_match'): $query"
+        return 1
+    fi
+    hit_n=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
+    if [ "$hit_n" -eq 1 ]; then
+        pick=$(printf '%s\n' "$hits" | cut -f1)
+        label=$(printf '%s\n' "$hits" | cut -f2)
+        printf '  %s\n' "$(t 'ui.match_single' "$label")" >&2
+        printf '%s' "$pick"
+        return 0
+    fi
+    printf '\n  %s\n' "$(t 'ui.match_multi' "$hit_n")" >&2
+    printf '%s\n' "$hits" | sed 's/\t/) /; s/^/    /' >&2
+    printf '\n  %s' "$(t 'ui.pick_number')" >&2
+    read -r pick || return 1
+    # 0 在列表界面表示返回，交给调用方处理
+    [ "$pick" = "0" ] && return 3
+    case "$pick" in
+        ''|*[!0-9]*) pika_warn "$(t 'ui.invalid'): $pick"; return 1 ;;
+    esac
+    printf '%s' "$pick"
+}
+
 # ---- Generic menu loop ----
 # $3 is an i18n key, unless $4 = 1, in which case it is the title itself.
 _menu_loop() {
     local arr_name="$2" title_key="$3" literal="${4:-0}"
     local -n items="$arr_name"
-    local title
+    local title hits hit_n sel_new
     if [ "$literal" = "1" ]; then
         title="$title_key"
     else
@@ -578,6 +620,22 @@ _menu_loop() {
 
         # Back: 0, b/back, q/quit
         if ui_is_back "$sel"; then return 0; fi
+
+        # 非数字输入按关键词匹配当前菜单，省去数编号
+        if [ -n "$sel" ]; then
+            case "$sel" in
+                *[!0-9]*)
+                    local rrc=0
+                    sel_new=$(_pika_menu_resolve "$arr_name" "$sel") || rrc=$?
+                    if [ "$rrc" -ne 0 ]; then
+                        [ "$rrc" -eq 3 ] && return 0
+                        sleep 1
+                        continue
+                    fi
+                    sel="$sel_new"
+                    ;;
+            esac
+        fi
 
         local rc=0
         ui_dispatch "$arr_name" "$sel" || rc=$?
@@ -640,6 +698,7 @@ main() {
     fi
 
     # Interactive main menu loop
+    local sel sel_new
     while true; do
         # Size the columns from MENU_MAIN so no title or description is cut off.
         ui_menu_size "MENU_MAIN" "$(t 'menu.exit')"
@@ -668,6 +727,22 @@ main() {
         case "$sel" in
             0|q|Q|exit|quit) echo ""; pika_info "Goodbye!"; exit 0 ;;
         esac
+
+        # 关键词直达：输入“证书”“反向代理”等直接定位编号
+        if [ -n "$sel" ]; then
+            case "$sel" in
+                *[!0-9]*)
+                    local rrc=0
+                    sel_new=$(_pika_menu_resolve "MENU_MAIN" "$sel") || rrc=$?
+                    if [ "$rrc" -ne 0 ]; then
+                        if [ "$rrc" -eq 3 ]; then echo ""; pika_info "Goodbye!"; exit 0; fi
+                        sleep 1
+                        continue
+                    fi
+                    sel="$sel_new"
+                    ;;
+            esac
+        fi
 
         local cidx=1 found=0
         for entry in "${MENU_MAIN[@]}"; do

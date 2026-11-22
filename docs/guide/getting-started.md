@@ -23,11 +23,19 @@ bash <(curl -fsSL https://pikash.opkg.cn/Menu.sh)
 
 | 类别 | 说明 |
 |:-----|:-----|
-| 🖥️ **一键部署** | 换源/面板/探针/Docker+Podman/组网/中转 |
-| 🔧 **日常维护** | 清理/BBR/Swap/Fail2ban/UFW/DD重装/ACME/Aria2/监控 |
-| 🎨 **桌面安装** | Debian LXC 容器 8 种桌面 |
+| 🚀 **部署安装** | 面板、容器、探针、Docker+Podman、组网、中转 |
+| 🔧 **系统维护** | 清理/BBR/Swap/Fail2ban/UFW/DD重装/ACME/Aria2/监控 |
+| 🎨 **桌面环境** | Debian LXC 容器 8 种桌面 |
 | 📊 **性能测评** | 13款测评+网络诊断工具 |
-| 🌐 **代理配置** | 3X-UI/Clash/HY2/SS/Trojan/WARP/WireGuard/wg-easy |
+| 🧩 **软件安装** | Lucky/Halo/SiYuan/LobeChat/NPS/DDNS-GO 等 50+ 款，按类别分组 |
+| 🌐 **代理组网** | 3X-UI/Clash/HY2/SS/Trojan/WARP/WireGuard/wg-easy |
+| 🛡️ **反向代理** | Caddy / Nginx 站点、证书、服务统一管理，进入即按已装引擎定位 |
+| ⚙️ **系统工具** | SSH 加固、时区、自更新、卸载 |
+| 📦 **安装脚本** | 安装到 `/usr/local/bin/pikash` 供本地调用 |
+
+> 💡 提示符除了编号还接受关键词：输入「证书」会直接匹配到「证书管理」，命中多个时列出编号供选择，`0` 返回上一级。
+
+怀疑镜像没更新时，用两条命令自查：`bash Menu.sh --version` 看版本号，`bash Menu.sh --doctor` 看入口、核心库、语言包与模块缓存的指纹。模块下载失败时，脚本会逐个列出下载源和失败原因（超时 / 语法错误 / 与语言包不同步），而不是只报一句“错误”。
 
 > 也支持直接传参：`bash Menu.sh 20` 直接运行融合怪测评。
 
