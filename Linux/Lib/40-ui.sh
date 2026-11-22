@@ -55,52 +55,79 @@ _ui_repeat_char() {
     printf '%s' "$s"
 }
 
-# ---- Pad/truncate a string to a target display width (CJK-aware) ----
+# ---- Fast display width (pure bash, no subprocess) ----
+# Counts UTF-8 lead bytes as one column and 3/4-byte leads (CJK, emoji) as two.
+_ui_w_fast() {
+    local s="$1" _lc="${LC_ALL-__PIKA_UNSET__}"
+    local leads chars wides wide
+    LC_ALL=C
+    leads="${s//[$'\x80'-$'\xbf']/}"
+    chars=${#leads}
+    wides="${leads//[!$'\xe0'-$'\xf7']/}"
+    wide=${#wides}
+    if [ "$_lc" = "__PIKA_UNSET__" ]; then unset LC_ALL; else LC_ALL="$_lc"; fi
+    printf '%s' $((chars + wide))
+}
+
+# ---- Pad/truncate a string to exactly N display columns (CJK-aware) ----
+# The result is always N columns wide, so menu rows line up with the divider.
 _ui_str_pad() {
-    local s="$1" target="$2" maxw="$3"   # maxw: max chars before truncating (optional)
-    local use_python=0
-    if command -v python3 >/dev/null 2>&1 && python3 -c "" 2>/dev/null; then use_python=1; fi
+    local s="${1-}" target="${2-0}" out w cut pad
+    case "$target" in ''|*[!0-9]*) printf '%s' "$s"; return 0 ;; esac
+    [ "$target" -le 0 ] && return 0
 
-    # Compute display width
-    local cur
-    if [ "$use_python" = "1" ]; then
-        cur=$(python3 -c "import sys,unicodedata; s=sys.argv[1]; print(sum(2 if unicodedata.east_asian_width(c) in ('W','F') else 1 for c in s))" -- "$s" 2>/dev/null)
-    else
-        local _lc="${LC_ALL-__N__}"; LC_ALL=C
-        local leads="${s//[$'\x80'-$'\xbf']/}"
-        local chars=${#leads}
-        local wides="${leads//[!$'\xe0'-$'\xf7']/}"
-        local wide=${#wides}
-        [ "$_lc" = "__N__" ] && unset LC_ALL || LC_ALL="$_lc"
-        cur=$((chars + wide))
+    # Prefer python3 for exact east-asian-width; otherwise use the bash heuristic.
+    if [ -z "${_UI_HAS_PY:-}" ]; then
+        if command -v python3 >/dev/null 2>&1 && python3 -c "" 2>/dev/null; then
+            _UI_HAS_PY=1
+        else
+            _UI_HAS_PY=0
+        fi
     fi
 
-    # If fits, just pad
-    if [ "$cur" -le "$target" ]; then
-        printf '%s%*s' "$s" $((target - cur)) ''
-        return
+    if [ "$_UI_HAS_PY" = "1" ]; then
+        python3 -c '
+import sys, unicodedata
+s = sys.argv[1]; target = int(sys.argv[2])
+def w(t):
+    return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in t)
+if w(s) > target:
+    cut = max(0, target - 3)
+    out, acc = [], 0
+    for c in s:
+        cw = 2 if unicodedata.east_asian_width(c) in ("W", "F") else 1
+        if acc + cw > cut:
+            break
+        out.append(c); acc += cw
+    s = "".join(out) + "..."
+    if w(s) > target:
+        s = "".join(out)
+sys.stdout.write(s + " " * max(0, target - w(s)))
+' -- "$s" "$target" 2>/dev/null && return 0
+        _UI_HAS_PY=0
     fi
 
-    # Too long — truncate safely (python3 path keeps valid UTF-8)
-    if [ "$use_python" = "1" ]; then
-        local maxc="${maxw:-$target}"
-        python3 -c "
-import sys,unicodedata
-s=sys.argv[1]; target=int(sys.argv[2]); maxc=int(sys.argv[3])
-w=0; i=0
-for c in s:
-    cw=2 if unicodedata.east_asian_width(c) in ('W','F') else 1
-    if w+cw > target or i>=maxc:
-        break
-    sys.stdout.write(c)
-    w+=cw; i+=1
-sys.stdout.write('...')
-" -- "$s" "$((target-3))" "$((target-3))" 2>/dev/null && return
+    out="$s"
+    w=$(_ui_w_fast "$out")
+    if [ "$w" -gt "$target" ]; then
+        cut=$((target - 3))
+        [ "$cut" -lt 0 ] && cut=0
+        while [ -n "$out" ] && [ "$(_ui_w_fast "$out")" -gt "$cut" ]; do
+            out="${out%?}"
+        done
+        out="${out}..."
+        w=$(_ui_w_fast "$out")
+        if [ "$w" -gt "$target" ]; then
+            out="${out%???}"
+            w=$(_ui_w_fast "$out")
+        fi
+        printf '%s' "$out"
+        printf '%*s' "$((target - w))" ''
+        return 0
     fi
 
-    # Fallback truncation: just take first N raw chars + "..." (avoids broken UTF-8)
-    local raw; raw="${s:0:$((target-3))}"
-    printf '%s...' "$raw"
+    pad=$((target - w))
+    printf '%s%*s' "$out" "$pad" ''
 }
 
 # ---- Terminal width ----
@@ -214,26 +241,25 @@ ${N}"
 }
 
 # ============================================================
-#  Menu item:  [1]  Name                Description
+#  Menu item:  [1]  Name            Description
+#  Total width is fixed so every row matches the 58-char divider:
+#    2 (indent) + 4 ([N]) + 2 + 12 (name) + 2 + 38 (desc) = 60
 # ============================================================
+_UI_NUM_COL=4
+_UI_GAP=2
+_UI_NAME_COL=12
+_UI_DESC_COL=38
+
 ui_item() {
     local num="$1" name="$2" desc="${3:-}"
-    # Column layout:  2 (indent) + 4 ([N]) + 2 (gap) + name_col (14) + 2 (gap) + desc_col (38) = 60 cols
-    local name_col=14
-    local desc_col=38
-    local name_padded; name_padded=$(_ui_str_pad "$name" "$name_col")
-    local desc_padded; desc_padded=$(_ui_str_pad "$desc" "$desc_col")
+    local name_padded desc_padded
+    name_padded=$(_ui_str_pad "$name" "$_UI_NAME_COL")
+    desc_padded=$(_ui_str_pad "$desc" "$_UI_DESC_COL")
 
-    if [ -n "$desc" ]; then
-        printf '  %s%4s%s  %s%s%s  %s%s%s\n' \
-            "${PIKA_GREEN}" "[$num]" "${PIKA_NC}" \
-            "${PIKA_BOLD}" "$name_padded" "${PIKA_NC}" \
-            "${PIKA_BLUE}" "$desc_padded" "${PIKA_NC}"
-    else
-        printf '  %s%4s%s  %s%s%s\n' \
-            "${PIKA_GREEN}" "[$num]" "${PIKA_NC}" \
-            "${PIKA_BOLD}" "$name_padded" "${PIKA_NC}"
-    fi
+    printf '  %s%*s%s  %s%s%s  %s%s%s\n' \
+        "${PIKA_GREEN}" "$_UI_NUM_COL" "[$num]" "${PIKA_NC}" \
+        "${PIKA_BOLD}" "$name_padded" "${PIKA_NC}" \
+        "${PIKA_BLUE}" "$desc_padded" "${PIKA_NC}"
 }
 
 # ============================================================
