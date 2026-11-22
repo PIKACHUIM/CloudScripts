@@ -198,7 +198,7 @@ Caddy 与 Nginx 共用同一套编号：
 - 站点以片段形式保存在 `/etc/caddy/pika/sites/*.caddy`，主 Caddyfile 仅保留全局配置与 `import`
 - 新增站点：域名（多个用逗号分隔）、上游（支持多个做负载均衡）、证书模式、附加 Caddyfile 指令
 - 证书模式：自动 HTTPS（需 80/443 公网可达）、手动证书、`tls internal` 自签名、纯 HTTP
-- 证书管理：上传（配对校验 + SAN 解析）、acme.sh 交互申请、续期、列表与删除
+- 证书管理：上传（文件路径或直接粘贴 PEM，配对校验 + SAN 解析）、acme.sh 交互申请、续期、列表与删除
 - 每次变更前备份到 `/etc/caddy/pika/backups/`，`caddy validate` 失败自动回滚
 
 ### Nginx 管理
@@ -210,9 +210,11 @@ Caddy 与 Nginx 共用同一套编号：
 - 所有站点统一生成到 `/etc/nginx/conf.d/pika.conf`，元数据保存在 `/etc/pika-sh/nginx/meta/`
 - 生成内容包含 `upstream` 负载均衡、WebSocket 头、ACME Webroot 目录与 HTTP→HTTPS 跳转
 - 证书模式：自动 HTTPS（acme.sh HTTP-01 Webroot，需 80 端口）、手动证书、openssl 自签名、纯 HTTP
-- 证书管理：上传（配对校验 + SAN 解析）、acme.sh 交互申请（独立/Webroot/TLS-ALPN/DNS 手动）、续期、删除
+- 证书管理：上传（文件路径或直接粘贴 PEM，配对校验 + SAN 解析）、acme.sh 交互申请（独立/Webroot/TLS-ALPN/DNS 手动）、续期、删除
 - 每次变更前备份到 `/etc/pika-sh/nginx/backups/`，`nginx -t` 失败自动回滚
 
+> 证书「上传」同时接受文件路径和直接粘贴：粘贴时以 `-----BEGIN` 开头，粘贴完按一次回车；多段连续的 `BEGIN CERTIFICATE` 会一起保存，证书链不会丢。导入前会做配对校验（证书与私钥是否匹配）并从 SAN 取域名，没有 SAN 时回退到 CN。
+>
 > 证书「续期」只对 acme.sh 签发的证书生效：脚本会调用 `acme.sh --renew --force`，再把新证书装回本工具的证书目录并重载服务；手动上传的证书没有可续期的上游，会提示重新上传。DNS 手动模式仍会带上 `--yes-I-know-dns-manual-mode-enough-go-ahead-please` 开关。
 >
 > 服务「开机自启」按托管方式落地：systemd 用 `systemctl enable/disable`，容器 nohup 用 `/run.sh` 里的一行启动命令；PM2 托管时自启由 `pm2 startup` + `pm2 save` 统一管理，菜单会直接说明而不做单项开关。

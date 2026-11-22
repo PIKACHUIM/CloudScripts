@@ -989,29 +989,66 @@ _caddy_pick_cert() {
     printf '%s' "${CADDY_CERT_IDS[$((n - 1))]}"
 }
 
-# Import cert/key from arbitrary paths; echoes the cert id on stdout.
-_caddy_cert_import_flow() {
-    local c k id dir d
-    read -r -p "  $(t 'caddy.cert.certpath'): " c || return 1
-    read -r -p "  $(t 'caddy.cert.keypath'): " k || return 1
-    c="${c%\"}"; c="${c#\"}"
-    k="${k%\"}"; k="${k#\"}"
+# 没有 SAN 时用 CN 兜底，避免粘贴进来的证书拿不到域名
+_caddy_cert_cn() {
+    openssl x509 -in "$1" -noout -subject 2>/dev/null \
+        | sed -n 's/.*CN[[:space:]]*=[[:space:]]*\([^,]*\).*/\1/p' \
+        | head -1
+}
 
-    if [ ! -f "$c" ]; then
-        pika_err "$(t 'caddy.cert.missing'): $c"
+# 临时文件里是私钥：先清空再删，rm 失败时也不留密钥内容
+_caddy_cert_tmp_drop() {
+    local f
+    for f in "$@"; do
+        [ -n "$f" ] || continue
+        : > "$f" 2>/dev/null || true
+        rm -f "$f" 2>/dev/null || true
+    done
+}
+
+# Import cert/key from a path or pasted PEM; echoes the cert id on stdout.
+_caddy_cert_import_flow() {
+    local c k id dir d rc
+    UI_PEM_PUSHBACK=""
+    c=$(mktemp 2>/dev/null || echo "/tmp/pika-cert-$$.pem")
+    k=$(mktemp 2>/dev/null || echo "/tmp/pika-key-$$.pem")
+    chmod 600 "$c" "$k" 2>/dev/null || true
+
+    printf '\n  %s\n' "$(t 'ui.pem.tip')"
+
+    ui_read_pem "$(t 'caddy.cert.certpath')" "$c" "CERTIFICATE-----"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        case "$rc" in
+            2) pika_err "$(t 'caddy.cert.missing'): ${UI_PEM_INPUT:-?}" ;;
+            3) pika_err "$(t 'ui.pem.incomplete')" ;;
+            *) pika_info "$(t 'ui.cancelled')" ;;
+        esac
+        _caddy_cert_tmp_drop "$c" "$k"
         return 1
     fi
-    if [ ! -f "$k" ]; then
-        pika_err "$(t 'caddy.cert.missing'): $k"
+
+    ui_read_pem "$(t 'caddy.cert.keypath')" "$k" "PRIVATE KEY-----"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        case "$rc" in
+            2) pika_err "$(t 'caddy.cert.missing'): ${UI_PEM_INPUT:-?}" ;;
+            3) pika_err "$(t 'ui.pem.incomplete')" ;;
+            *) pika_info "$(t 'ui.cancelled')" ;;
+        esac
+        _caddy_cert_tmp_drop "$c" "$k"
         return 1
     fi
+
     if ! _caddy_cert_pair_ok "$c" "$k"; then
         pika_err "$(t 'caddy.cert.pairinvalid')"
+        _caddy_cert_tmp_drop "$c" "$k"
         return 1
     fi
 
     d=$(_caddy_cert_domains "$c")
-    [ -z "$d" ] && d=$(basename "${c%.*}")
+    [ -z "$d" ] && d=$(_caddy_cert_cn "$c")
+    [ -z "$d" ] && d="upload-$(date +%s)"
     id=$(_caddy_slug "${d%%,*}")
     dir="${CADDY_CERT_DIR}/${id}"
     if [ -d "$dir" ]; then
@@ -1023,6 +1060,7 @@ _caddy_cert_import_flow() {
     cp -f "$c" "${dir}/cert.pem"
     cp -f "$k" "${dir}/key.pem"
     chmod 600 "${dir}/cert.pem" "${dir}/key.pem"
+    _caddy_cert_tmp_drop "$c" "$k"
     _caddy_meta_file_set "${dir}/meta" "domains" "$d"
     _caddy_meta_file_set "${dir}/meta" "source" "upload"
     _caddy_meta_file_set "${dir}/meta" "created" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"

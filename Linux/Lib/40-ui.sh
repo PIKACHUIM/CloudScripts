@@ -355,6 +355,81 @@ ui_pause() {
     return 0
 }
 
+# 粘贴证书链时会多读一行，留给下一次 ui_read_pem 用，避免吞掉私钥首行
+UI_PEM_PUSHBACK=""
+
+# ============================================================
+#  Read a PEM block: accept a file path or pasted content
+#  Usage: ui_read_pem <prompt> <out_file> <end_marker>
+#  Returns: 0 = written, 2 = path not found, 3 = pasted block
+#           incomplete, 1 = empty / cancelled
+#  Pasted input starts with "-----BEGIN" and is copied verbatim up to
+#  the matching END line; on a terminal a following CERTIFICATE block
+#  (fullchain) is appended too, and any other lookahead line is pushed
+#  back so the next prompt can use it.
+#  UI_PEM_INPUT keeps the raw first line so callers can echo it back.
+# ============================================================
+ui_read_pem() {
+    local prompt="$1" out="$2" endmark="$3" line peek ended=0
+    UI_PEM_INPUT=""
+
+    if [ -n "${UI_PEM_PUSHBACK:-}" ]; then
+        line="$UI_PEM_PUSHBACK"
+        UI_PEM_PUSHBACK=""
+    else
+        printf '  %s: ' "$prompt"
+        IFS= read -r line || return 1
+    fi
+    line=${line%$'\r'}
+    # 去掉首尾空白，以及从别处粘贴时带上的双引号
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    line="${line%\"}"; line="${line#\"}"
+    [ -n "$line" ] || return 1
+    UI_PEM_INPUT="$line"
+
+    case "$line" in
+        "-----BEGIN"*)
+            : > "$out" || return 1
+            printf '%s\n' "$line" >> "$out"
+            while IFS= read -r line; do
+                line=${line%$'\r'}
+                printf '%s\n' "$line" >> "$out"
+                case "$line" in
+                    *"$endmark"*) ended=1; break ;;
+                esac
+            done
+            [ "$ended" -eq 1 ] || return 3
+            # 终端里继续读证书链；管道输入不 peek，避免吞掉后续回答
+            while [ -t 0 ]; do
+                IFS= read -r -t 2 peek || break
+                peek=${peek%$'\r'}
+                case "$peek" in
+                    "-----BEGIN CERTIFICATE"*)
+                        printf '%s\n' "$peek" >> "$out"
+                        while IFS= read -r line; do
+                            line=${line%$'\r'}
+                            printf '%s\n' "$line" >> "$out"
+                            case "$line" in *"$endmark"*) break ;; esac
+                        done
+                        ;;
+                    *)
+                        # 不是下一段证书：留给下一个输入框
+                        UI_PEM_PUSHBACK="$peek"
+                        break
+                        ;;
+                esac
+            done
+            return 0
+            ;;
+        *)
+            [ -f "$line" ] || return 2
+            cp -f "$line" "$out" || return 1
+            ;;
+    esac
+    return 0
+}
+
 # ============================================================
 #  Back / quit key detection
 #  0 = back (as printed in menus), b/back and q/quit/exit also work
