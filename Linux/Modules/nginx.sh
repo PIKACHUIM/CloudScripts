@@ -58,6 +58,7 @@ NginxCertsMENU=(
     "list|nginx.cert.list|nginx.cert.list.desc|do_nginx_cert_list"
     "upload|nginx.cert.upload|nginx.cert.upload.desc|do_nginx_cert_upload"
     "acme|nginx.cert.acme|nginx.cert.acme.desc|do_nginx_cert_acme"
+    "renew|nginx.cert.renew|nginx.cert.renew.desc|do_nginx_cert_renew"
     "del|nginx.cert.del|nginx.cert.del.desc|do_nginx_cert_delete"
 )
 
@@ -67,6 +68,7 @@ NginxServiceMENU=(
     "stop|nginx.svc.stop|nginx.svc.stop.desc|do_nginx_stop"
     "restart|nginx.svc.restart|nginx.svc.restart.desc|do_nginx_restart"
     "reload|nginx.svc.reload|nginx.svc.reload.desc|do_nginx_reload_action"
+    "autostart|nginx.svc.autostart|nginx.svc.autostart.desc|do_nginx_svc_autostart"
     "logs|nginx.svc.logs|nginx.svc.logs.desc|do_nginx_logs"
 )
 
@@ -1212,6 +1214,76 @@ do_nginx_cert_delete() {
     return 0
 }
 
+# ---- 续期：acme.sh 签发的走 renew，手动上传的引导重新导入 ----
+do_nginx_cert_renew() {
+    _nginx_require || return 1
+    if ! _nginx_collect_certs; then
+        pika_info "$(t 'nginx.cert.none')"
+        return 0
+    fi
+    local id
+    if ! id=$(_nginx_pick_cert); then
+        pika_info "$(t 'ui.cancelled')"
+        return 0
+    fi
+
+    local meta="${NGINX_CERT_DIR}/${id}/meta" d src first dir acme out
+    d=$(_nginx_meta_file_get "$meta" "domains" 2>/dev/null || true)
+    src=$(_nginx_meta_file_get "$meta" "source" 2>/dev/null || true)
+    [ -z "$d" ] && d="$id"
+
+    case "$src" in
+        acme)
+            acme=$(_nginx_acme_bin 2>/dev/null || true)
+            if [ -z "$acme" ] || [ ! -x "$acme" ]; then
+                pika_err "$(t 'nginx.cert.renew.noacme')"
+                return 1
+            fi
+            first=$(printf '%s' "$d" | cut -d, -f1)
+            pika_info "$(t 'nginx.cert.renew.running'): $first"
+
+            local -a rargs=(--renew -d "$first" --force)
+            # 手动 DNS 模式不带确认开关会被 acme.sh 拒绝
+            if grep -q "dns_manual" "${HOME}/.acme.sh/${first}/${first}.conf" 2>/dev/null; then
+                rargs+=(--yes-I-know-dns-manual-mode-enough-go-ahead-please)
+            fi
+            if ! out=$("$acme" "${rargs[@]}" 2>&1); then
+                printf '%s\n' "$out" | tail -5 >&2
+                pika_err "$(t 'nginx.cert.renew.failed')"
+                return 1
+            fi
+
+            dir="${NGINX_CERT_DIR}/${id}"
+            _nginx_write_reload_script
+            if ! "$acme" --install-cert -d "$first" \
+                --key-file "${dir}/key.pem" \
+                --fullchain-file "${dir}/cert.pem" \
+                --reloadcmd "$NGINX_RELOAD_SCRIPT"; then
+                pika_err "$(t 'nginx.cert.renew.failed')"
+                return 1
+            fi
+            chmod 600 "${dir}/cert.pem" "${dir}/key.pem" 2>/dev/null || true
+            _nginx_meta_file_set "$meta" "renewed" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            pika_info "$(t 'nginx.cert.renew.ok'): ${id} · $(_nginx_cert_expiry "${dir}/cert.pem")"
+            return 0
+            ;;
+        upload)
+            pika_warn "$(t 'nginx.cert.renew.upload')"
+            if ! pika_confirm "$(t 'nginx.cert.renew.reupload')"; then
+                pika_info "$(t 'ui.cancelled')"
+                return 0
+            fi
+            do_nginx_cert_upload
+            return $?
+            ;;
+        *)
+            pika_warn "$(t 'nginx.cert.renew.unknown')"
+            return 1
+            ;;
+    esac
+    return 0
+}
+
 # ============================================================
 #  ACME (acme.sh)
 # ============================================================
@@ -1615,4 +1687,9 @@ do_nginx_certs() {
 do_nginx_service() {
     _nginx_require || return 1
     _nginx_menu_loop "NginxServiceMENU" "nginx.service.title"
+}
+
+do_nginx_svc_autostart() {
+    _nginx_require || return 1
+    svc_autostart_prompt "nginx"
 }

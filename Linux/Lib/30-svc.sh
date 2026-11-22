@@ -77,7 +77,8 @@ svc_choose_backend() {
 #  systemd unit writer (strict: one ExecStart per line, no ; delimiter)
 # ============================================================
 _write_unit_strict() {
-    local name="$1" exec_cmd="$2" workdir="${3:-/}" user="${4:-root}" env_vars="${5:-}" desc="${6:-PIKA Service: $name}"
+    local name="$1" exec_cmd="$2" workdir="${3:-/}" user="${4:-root}" env_vars="${5:-}"
+    local desc="${6:-PIKA Service: $name}"
     local unit_file="/etc/systemd/system/${name}.service"
 
     cat > "$unit_file" << UNITEOF
@@ -118,6 +119,8 @@ UNITEOF
 # ============================================================
 _SVC_STATE_DIR="${PIKA_CONFIG_DIR}/services"
 _SVC_LOG_DIR="${PIKA_SVC_LOG_DIR:-/var/log}"
+# Container boot hook. Overridable so tests never touch the real /run.sh.
+_SVC_BOOT_FILE="${PIKA_SVC_BOOT_FILE:-/run.sh}"
 
 _svc_nohup_dir() {
     mkdir -p "$_SVC_STATE_DIR" 2>/dev/null || true
@@ -251,7 +254,7 @@ svc_register() {
                 pika_warn "无法启动 nohup 服务: $name"
             fi
             # Add to /run.sh for container auto-start
-            pika_file_append_unique "nohup $exec_cmd >> ${_SVC_LOG_DIR}/${name}.log 2>&1 &" "/run.sh"
+            pika_file_append_unique "$(svc_autostart_line "$name")" "$_SVC_BOOT_FILE"
             ;;
     esac
 }
@@ -345,6 +348,136 @@ svc_logs() {
         systemd) journalctl -u "$name" -n "$lines" --no-pager 2>/dev/null || pika_warn "无 systemd 日志" ;;
         nohup)   tail -n "$lines" "${_SVC_LOG_DIR}/${name}.log" 2>/dev/null || pika_warn "无 nohup 日志" ;;
     esac
+}
+
+# ---- Boot autostart line for the nohup backend ----
+# One place builds the /run.sh line, so registering and toggling can never
+# drift apart (a drifted line means "autostart: off" forever).
+svc_autostart_line() {
+    local name="$1" cmd_file cmd
+    [ -z "$name" ] && return 1
+    cmd_file="$(_svc_nohup_dir)/${name}.cmd"
+    [ -f "$cmd_file" ] || return 1
+    cmd=$(cat "$cmd_file" 2>/dev/null || true)
+    [ -n "$cmd" ] || return 1
+    printf 'nohup %s >> %s/%s.log 2>&1 &' "$cmd" "$_SVC_LOG_DIR" "$name"
+}
+
+# ---- Autostart state: on | off | na | unknown ----
+# na = the backend manages boot globally (PM2 resurrects its saved list),
+# so there is no honest per-service answer.
+svc_autostart_state() {
+    local name="$1" st line
+    if [ -z "$name" ]; then
+        printf 'unknown'
+        return 0
+    fi
+    case "$(svc_backend)" in
+        systemd)
+            st=$(systemctl is-enabled "$name" 2>/dev/null || true)
+            case "$st" in
+                enabled|enabled-runtime|static|indirect|generated) printf 'on' ;;
+                disabled|masked|masked-runtime|linked|linked-runtime|alias) printf 'off' ;;
+                *) printf 'unknown' ;;
+            esac
+            ;;
+        nohup)
+            if ! line=$(svc_autostart_line "$name"); then
+                printf 'unknown'
+                return 0
+            fi
+            if [ -f "$_SVC_BOOT_FILE" ] && grep -qxF -- "$line" "$_SVC_BOOT_FILE" 2>/dev/null; then
+                printf 'on'
+            else
+                printf 'off'
+            fi
+            ;;
+        pm2)
+            printf 'na'
+            ;;
+        *)
+            printf 'unknown'
+            ;;
+    esac
+    return 0
+}
+
+# ---- Turn boot autostart on/off ----
+svc_autostart_set() {
+    local name="$1" want="$2" line f tmp
+    [ -z "$name" ] && return 1
+    case "$want" in on|off) ;; *) return 1 ;; esac
+
+    case "$(svc_backend)" in
+        systemd)
+            if [ "$want" = "on" ]; then
+                systemctl enable "$name" >/dev/null 2>&1 || return 1
+            else
+                systemctl disable "$name" >/dev/null 2>&1 || return 1
+            fi
+            ;;
+        nohup)
+            line=$(svc_autostart_line "$name") || return 1
+            f="$_SVC_BOOT_FILE"
+            if [ "$want" = "on" ]; then
+                mkdir -p "${f%/*}" 2>/dev/null || true
+                pika_file_append_unique "$line" "$f" || return 1
+            else
+                [ -f "$f" ] || return 0
+                tmp="${f}.pika-$$.tmp"
+                grep -vxF -- "$line" "$f" > "$tmp" 2>/dev/null || true
+                mv -f "$tmp" "$f" 2>/dev/null || { rm -f "$tmp" 2>/dev/null; return 1; }
+            fi
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    # Verify instead of trusting the exit code: systemctl can "succeed" on a
+    # masked unit and nohup can fail on a read-only /run.sh.
+    [ "$(svc_autostart_state "$name")" = "$want" ]
+}
+
+# ---- Interactive autostart toggle shared by Caddy / Nginx service menus ----
+svc_autostart_prompt() {
+    local name="$1" st want
+    if [ -z "$name" ]; then
+        pika_err "$(t 'svc.autostart.unknown')"
+        return 1
+    fi
+    st=$(svc_autostart_state "$name")
+    case "$st" in
+        na)
+            pika_info "$(t 'svc.autostart.pm2')"
+            return 0
+            ;;
+        unknown)
+            pika_warn "$(t 'svc.autostart.unknown')"
+            return 1
+            ;;
+        on)
+            printf '\n  %s: %s\n' "$(t 'svc.autostart.label')" "$(t 'svc.autostart.on')"
+            want="off"
+            pika_confirm "$(t 'svc.autostart.turn_off')" || { pika_info "$(t 'ui.cancelled')"; return 0; }
+            ;;
+        *)
+            printf '\n  %s: %s\n' "$(t 'svc.autostart.label')" "$(t 'svc.autostart.off')"
+            want="on"
+            pika_confirm "$(t 'svc.autostart.turn_on')" || { pika_info "$(t 'ui.cancelled')"; return 0; }
+            ;;
+    esac
+
+    if svc_autostart_set "$name" "$want"; then
+        if [ "$want" = "on" ]; then
+            pika_info "$(t 'svc.autostart.enabled')"
+        else
+            pika_info "$(t 'svc.autostart.disabled')"
+        fi
+        return 0
+    fi
+    pika_err "$(t 'svc.autostart.failed')"
+    return 1
 }
 
 # ---- Remove/uninstall a service completely ----

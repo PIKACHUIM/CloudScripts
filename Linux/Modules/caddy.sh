@@ -52,6 +52,7 @@ CaddyCertsMENU=(
     "list|caddy.cert.list|caddy.cert.list.desc|do_caddy_cert_list"
     "upload|caddy.cert.upload|caddy.cert.upload.desc|do_caddy_cert_upload"
     "acme|caddy.cert.acme|caddy.cert.acme.desc|do_caddy_cert_acme"
+    "renew|caddy.cert.renew|caddy.cert.renew.desc|do_caddy_cert_renew"
     "del|caddy.cert.del|caddy.cert.del.desc|do_caddy_cert_delete"
 )
 
@@ -61,6 +62,7 @@ CaddyServiceMENU=(
     "stop|caddy.service.stop|caddy.service.stop.desc|do_caddy_stop"
     "restart|caddy.service.restart|caddy.service.restart.desc|do_caddy_restart"
     "reload|caddy.service.reload|caddy.service.reload.desc|do_caddy_reload_action"
+    "autostart|caddy.service.autostart|caddy.service.autostart.desc|do_caddy_svc_autostart"
     "logs|caddy.service.logs|caddy.service.logs.desc|do_caddy_logs"
 )
 
@@ -1135,6 +1137,76 @@ do_caddy_cert_delete() {
     return 0
 }
 
+# ---- 续期：acme.sh 签发的走 renew，手动上传的引导重新导入 ----
+do_caddy_cert_renew() {
+    _caddy_require || return 1
+    if ! _caddy_collect_certs; then
+        pika_info "$(t 'caddy.cert.none')"
+        return 0
+    fi
+    local id
+    if ! id=$(_caddy_pick_cert); then
+        pika_info "$(t 'ui.cancelled')"
+        return 0
+    fi
+
+    local meta="${CADDY_CERT_DIR}/${id}/meta" d src first dir acme out
+    d=$(_caddy_meta_file_get "$meta" "domains" 2>/dev/null || true)
+    src=$(_caddy_meta_file_get "$meta" "source" 2>/dev/null || true)
+    [ -z "$d" ] && d="$id"
+
+    case "$src" in
+        acme)
+            acme=$(_caddy_acme_bin 2>/dev/null || true)
+            if [ -z "$acme" ] || [ ! -x "$acme" ]; then
+                pika_err "$(t 'caddy.cert.renew.noacme')"
+                return 1
+            fi
+            first=$(printf '%s' "$d" | cut -d, -f1)
+            pika_info "$(t 'caddy.cert.renew.running'): $first"
+
+            local -a rargs=(--renew -d "$first" --force)
+            # 手动 DNS 模式不带确认开关会被 acme.sh 拒绝
+            if grep -q "dns_manual" "${HOME}/.acme.sh/${first}/${first}.conf" 2>/dev/null; then
+                rargs+=(--yes-I-know-dns-manual-mode-enough-go-ahead-please)
+            fi
+            if ! out=$("$acme" "${rargs[@]}" 2>&1); then
+                printf '%s\n' "$out" | tail -5 >&2
+                pika_err "$(t 'caddy.cert.renew.failed')"
+                return 1
+            fi
+
+            dir="${CADDY_CERT_DIR}/${id}"
+            _caddy_write_reload_script
+            if ! "$acme" --install-cert -d "$first" \
+                --key-file "${dir}/key.pem" \
+                --fullchain-file "${dir}/cert.pem" \
+                --reloadcmd "$CADDY_RELOAD_SCRIPT"; then
+                pika_err "$(t 'caddy.cert.renew.failed')"
+                return 1
+            fi
+            chmod 600 "${dir}/cert.pem" "${dir}/key.pem" 2>/dev/null || true
+            _caddy_meta_file_set "$meta" "renewed" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            pika_info "$(t 'caddy.cert.renew.ok'): ${id} · $(_caddy_cert_expiry "${dir}/cert.pem")"
+            return 0
+            ;;
+        upload)
+            pika_warn "$(t 'caddy.cert.renew.upload')"
+            if ! pika_confirm "$(t 'caddy.cert.renew.reupload')"; then
+                pika_info "$(t 'ui.cancelled')"
+                return 0
+            fi
+            do_caddy_cert_upload
+            return $?
+            ;;
+        *)
+            pika_warn "$(t 'caddy.cert.renew.unknown')"
+            return 1
+            ;;
+    esac
+    return 0
+}
+
 # ============================================================
 #  ACME (acme.sh) interactive issuance
 # ============================================================
@@ -1462,4 +1534,9 @@ do_caddy_certs() {
 do_caddy_service() {
     _caddy_require || return 1
     _caddy_menu_loop "CaddyServiceMENU" "caddy.service.title"
+}
+
+do_caddy_svc_autostart() {
+    _caddy_require || return 1
+    svc_autostart_prompt "$(_caddy_svc_name)"
 }

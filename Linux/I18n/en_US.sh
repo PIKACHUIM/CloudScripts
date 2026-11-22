@@ -757,3 +757,45 @@ T_software_cat_ai="AI & Development"
 T_software_cat_ai_desc="AI chat, API gateways, Git hosting, automation"
 T_software_cat_read="Reading & Utilities"
 T_software_cat_read_desc="RSS, read-later, page watch, push, PDF"
+
+# ---- Service autostart (shared by Caddy / Nginx) ----
+T_svc_autostart_label="Autostart"
+T_svc_autostart_on="enabled"
+T_svc_autostart_off="disabled"
+T_svc_autostart_turn_on="Enable autostart on boot?"
+T_svc_autostart_turn_off="Disable autostart on boot?"
+T_svc_autostart_enabled="Autostart enabled"
+T_svc_autostart_disabled="Autostart disabled"
+T_svc_autostart_failed="Failed to change autostart, check the service state"
+T_svc_autostart_unknown="Cannot determine autostart: service not registered or backend unsupported"
+T_svc_autostart_pm2="Managed by PM2: boot starts come from pm2 startup + pm2 save"
+
+# ---- Caddy autostart ----
+T_caddy_service_autostart="Autostart"
+T_caddy_service_autostart_desc="Start Caddy on boot"
+
+# ---- Nginx autostart ----
+T_nginx_svc_autostart="Autostart"
+T_nginx_svc_autostart_desc="Start Nginx on boot"
+
+# ---- Caddy certificate renewal ----
+T_caddy_cert_renew="Renew certificate"
+T_caddy_cert_renew_desc="In-place renewal for acme.sh issued certs"
+T_caddy_cert_renew_running="Renewing"
+T_caddy_cert_renew_ok="Renewed, new expiry"
+T_caddy_cert_renew_failed="Renewal failed, see the acme.sh output above"
+T_caddy_cert_renew_noacme="acme.sh not found, cannot renew; upload a new certificate instead"
+T_caddy_cert_renew_upload="This certificate was uploaded manually; renewal needs a new cert.pem / key.pem"
+T_caddy_cert_renew_reupload="Upload a new certificate now?"
+T_caddy_cert_renew_unknown="Unknown certificate source, cannot renew"
+
+# ---- Nginx certificate renewal ----
+T_nginx_cert_renew="Renew certificate"
+T_nginx_cert_renew_desc="In-place renewal for acme.sh issued certs"
+T_nginx_cert_renew_running="Renewing"
+T_nginx_cert_renew_ok="Renewed, new expiry"
+T_nginx_cert_renew_failed="Renewal failed, see the acme.sh output above"
+T_nginx_cert_renew_noacme="acme.sh not found, cannot renew; upload a new certificate instead"
+T_nginx_cert_renew_upload="This certificate was uploaded manually; renewal needs a new cert.pem / key.pem"
+T_nginx_cert_renew_reupload="Upload a new certificate now?"
+T_nginx_cert_renew_unknown="Unknown certificate source, cannot renew"

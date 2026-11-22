@@ -757,3 +757,45 @@ T_software_cat_ai="AI 与开发"
 T_software_cat_ai_desc="AI 对话、API 网关、Git 服务、自动化"
 T_software_cat_read="阅读与工具"
 T_software_cat_read_desc="RSS、稍后阅读、网页监控、消息推送、PDF"
+
+# ---- 服务开机自启（Caddy / Nginx 共用） ----
+T_svc_autostart_label="开机自启"
+T_svc_autostart_on="已启用"
+T_svc_autostart_off="未启用"
+T_svc_autostart_turn_on="是否启用开机自启?"
+T_svc_autostart_turn_off="是否关闭开机自启?"
+T_svc_autostart_enabled="已启用开机自启"
+T_svc_autostart_disabled="已关闭开机自启"
+T_svc_autostart_failed="设置开机自启失败，请检查服务状态"
+T_svc_autostart_unknown="无法判断自启状态：服务未注册，或当前托管方式不支持"
+T_svc_autostart_pm2="PM2 托管：自启由 pm2 startup + pm2 save 统一管理，无需单独设置"
+
+# ---- Caddy 服务自启 ----
+T_caddy_service_autostart="开机自启"
+T_caddy_service_autostart_desc="开机自动拉起 Caddy"
+
+# ---- Nginx 服务自启 ----
+T_nginx_svc_autostart="开机自启"
+T_nginx_svc_autostart_desc="开机自动拉起 Nginx"
+
+# ---- Caddy 证书续期 ----
+T_caddy_cert_renew="续期证书"
+T_caddy_cert_renew_desc="acme.sh 签发的证书可在线续期"
+T_caddy_cert_renew_running="正在续期"
+T_caddy_cert_renew_ok="续期完成，新到期时间"
+T_caddy_cert_renew_failed="续期失败，请查看上方 acme.sh 输出"
+T_caddy_cert_renew_noacme="未找到 acme.sh，无法自动续期；手动上传的证书请重新上传"
+T_caddy_cert_renew_upload="该证书是手动上传的，续期需要重新上传新的 cert.pem / key.pem"
+T_caddy_cert_renew_reupload="现在重新上传证书?"
+T_caddy_cert_renew_unknown="未知证书来源，无法续期"
+
+# ---- Nginx 证书续期 ----
+T_nginx_cert_renew="续期证书"
+T_nginx_cert_renew_desc="acme.sh 签发的证书可在线续期"
+T_nginx_cert_renew_running="正在续期"
+T_nginx_cert_renew_ok="续期完成，新到期时间"
+T_nginx_cert_renew_failed="续期失败，请查看上方 acme.sh 输出"
+T_nginx_cert_renew_noacme="未找到 acme.sh，无法自动续期；手动上传的证书请重新上传"
+T_nginx_cert_renew_upload="该证书是手动上传的，续期需要重新上传新的 cert.pem / key.pem"
+T_nginx_cert_renew_reupload="现在重新上传证书?"
+T_nginx_cert_renew_unknown="未知证书来源，无法续期"
