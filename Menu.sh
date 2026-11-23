@@ -20,7 +20,7 @@ if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ] || { [ "${BASH_VERSINFO[0]:-0}" -eq 4 ] &&
     exit 1
 fi
 
-PIKA_VERSION="1.10"
+PIKA_VERSION="1.11"
 PIKA_BASE="$(cd "$(dirname "$0")" && pwd)"
 PIKA_LIB_DIR="${PIKA_BASE}/Linux/Lib"
 PIKA_MOD_DIR="${PIKA_BASE}/Linux/Modules"
@@ -215,6 +215,27 @@ _pika_pick_site() {
 }
 
 # Resolve the base URL once: explicit override > cached choice > live probe.
+# Cached-only variant: no network at all. Used when every library is already on
+# disk, so drawing the menu must not wait for a mirror probe.
+_pika_site_cached() {
+    local cache="${PIKA_CACHE_DIR}/site.conf" base ts now
+    if [ -n "${PIKA_MIRROR:-}" ]; then
+        printf '%s' "${PIKA_MIRROR%/}"
+        return 0
+    fi
+    if [ -f "$cache" ]; then
+        base=$(sed -n '1p' "$cache" 2>/dev/null || true)
+        ts=$(sed -n '2p' "$cache" 2>/dev/null || echo 0)
+        case "$ts" in ''|*[!0-9]*) ts=0 ;; esac
+        now=$(date +%s)
+        if [ -n "$base" ] && [ $((now - ts)) -lt 86400 ]; then
+            printf '%s' "$base"
+            return 0
+        fi
+    fi
+    printf '%s' "$PIKA_SITE_CN"
+}
+
 _pika_resolve_site() {
     local cache="${PIKA_CACHE_DIR}/site.conf" base ts now
 
@@ -258,8 +279,21 @@ _bootstrap() {
     command -v curl >/dev/null 2>&1 || { apt-get update -qq 2>/dev/null && apt-get install -y -qq curl 2>/dev/null; } || true
     command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || { echo "ERROR: curl or wget required." >&2; exit 1; }
 
-    # Pick the closest reachable mirror once, reuse it for every library
-    local base; base=$(_pika_resolve_site)
+    # Pick the closest reachable mirror once, reuse it for every library.
+    # Probing costs a full network round trip (and up to ~8s when a host is
+    # blackholed), so only do it when a library is actually missing on disk.
+    local base need_net=0 _l
+    for _l in 00-core.sh 10-net.sh 20-pkg.sh 30-svc.sh 40-ui.sh 50-i18n.sh; do
+        if [ ! -f "${PIKA_LIB_DIR}/${_l}" ]; then
+            need_net=1
+            break
+        fi
+    done
+    if [ "$need_net" -eq 1 ]; then
+        base=$(_pika_resolve_site)
+    else
+        base=$(_pika_site_cached)
+    fi
     PIKA_SITE_BASE="$base"
     export PIKA_SITE_BASE
 
@@ -368,8 +402,28 @@ _pika_get() {  # url outfile
         wget -q -T 25 -t 1 -O "$2" "$1" 2>/dev/null
 }
 
+# 本次运行里已经 source 过的模块：返回主菜单再进来就别再取一遍
+declare -gA _PIKA_MOD_LOADED=() 2>/dev/null || true
+# 模块缓存的可信时长（秒）。0 = 每次都回源
+PIKA_MOD_TTL="${PIKA_MOD_TTL:-600}"
+
+_pika_mod_fresh() {
+    local f="$1" ttl="${PIKA_MOD_TTL:-600}" now mt
+    [ -s "$f" ] || return 1
+    case "$ttl" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$ttl" -le 0 ] && return 1
+    now=$(date +%s)
+    mt=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)
+    case "$mt" in ''|*[!0-9]*) return 1 ;; esac
+    [ $((now - mt)) -lt "$ttl" ]
+}
+
 _load_module() {
     local mod="$1"
+    # 已经加载过：函数都在内存里，再取一次纯属浪费
+    if [ -n "${_PIKA_MOD_LOADED[$mod]+x}" ]; then
+        return 0
+    fi
     local cache_dir="${PIKA_CACHE_DIR}/modules"
     mkdir -p "$cache_dir"
 
@@ -377,12 +431,22 @@ _load_module() {
     local local_mod="${PIKA_MOD_DIR}/${mod}"
     if [ -f "$local_mod" ]; then
         . "$local_mod"
-        return
+        _PIKA_MOD_LOADED[$mod]=1
+        return 0
     fi
 
     local cached="${cache_dir}/${mod}"
     local tmpf="${cached}.tmp"
     local keep="${cached}.keep"
+
+    # 缓存够新就直接用。每次进子菜单都删缓存重新下载，是菜单卡顿的主因。
+    if _pika_mod_fresh "$cached" && bash -n "$cached" 2>/dev/null \
+        && [ -z "$(_pika_module_missing_keys "$cached")" ]; then
+        . "$cached"
+        _PIKA_MOD_LOADED[$mod]=1
+        return 0
+    fi
+
     rm -f "$tmpf" "$keep" "$cached"
 
     # Every source that can serve this module, in preference order.
@@ -415,7 +479,8 @@ _load_module() {
         if [ -z "$missing" ]; then
             mv -f "$tmpf" "$cached"
             . "$cached"
-            return
+            _PIKA_MOD_LOADED[$mod]=1
+            return 0
         fi
         pika_debug "module ${mod}: ${src} is out of sync (missing: ${missing})"
         mcount=$(printf '%s' "$missing" | wc -w | tr -d ' ')
@@ -435,7 +500,8 @@ _load_module() {
         PIKA_KEEP_SCREEN=1
         mv -f "$best" "$cached"
         . "$cached"
-        return
+        _PIKA_MOD_LOADED[$mod]=1
+        return 0
     fi
 
     pika_err "$(t 'common.module_failed' "$mod")"
@@ -708,21 +774,26 @@ main() {
         ui_clear
         ui_header
         ui_divider "$((row_w - 2))"
-        ui_section "$(t 'menu.main')"
+        t_into 'menu.main'
+        ui_section "$_T"
         ui_sysinfo
         echo ""
         ui_divider "$((row_w - 2))"
 
         local idx=1
         for entry in "${MENU_MAIN[@]}"; do
-            local key title_key desc_key handler
+            local key title_key desc_key handler t_name t_desc
             IFS='|' read -r key title_key desc_key handler <<< "$entry"
-            ui_item "$idx" "$(t "$title_key")" "$(t "$desc_key")"
+            t_into "$title_key"; t_name="$_T"
+            t_into "$desc_key";  t_desc="$_T"
+            ui_item "$idx" "$t_name" "$t_desc"
             idx=$((idx + 1))
         done
-        ui_item "0" "$(t 'menu.exit')" ""
+        t_into 'menu.exit'
+        ui_item "0" "$_T" ""
         echo ""
-        printf "  $(t 'menu.prompt') "
+        t_into 'menu.prompt'
+        printf '  %s ' "$_T"
         read -r sel
 
         case "$sel" in

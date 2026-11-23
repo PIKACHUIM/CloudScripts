@@ -41,6 +41,20 @@ t() {
     fi
 }
 
+# 同 t()，但结果写进 _T。菜单每画一行都要取两次文案，
+# $(t ...) 每次都会 fork 一个子 shell，几十行加起来就是可见的延迟。
+t_into() {
+    local key="$1"; shift
+    local varname="T_${key//./_}"
+    local msg="${!varname}"
+    if [ $# -gt 0 ]; then
+        # shellcheck disable=SC2059
+        printf -v _T "${msg:-$key}" "$@"
+    else
+        _T="${msg:-$key}"
+    fi
+}
+
 # ============================================================
 #  Load language pack — local first, then remote CDN fallback
 # ============================================================

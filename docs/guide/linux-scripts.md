@@ -4,6 +4,8 @@ Linux 脚本是 CloudScripts 的核心部分，覆盖服务器部署、性能测
 
 > 💡 **推荐使用总菜单**：`bash <(curl -s https://raw.githubusercontent.com/PIKACHUIM/CloudScripts/main/Menu.sh)` 一键进入，无需记忆命令。
 
+**关于启动速度**：菜单本身不发网络请求。本地脚本文件齐全时不会去探测下载线路，系统信息只采集一次、菜单重绘直接复用；子菜单模块首次进入时下载，10 分钟内再次进入直接用缓存（`PIKA_MOD_TTL=0` 可强制每次回源）。用 `bash <(curl ...)` 方式运行时本地没有文件，启动阶段的几个库和首次进入子菜单的模块才需要下载。
+
 ---
 
 ## 服务器部署脚本

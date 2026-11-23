@@ -17,51 +17,21 @@ UI_MENU_RENDERED=0
 
 # ============================================================
 #  CJK-aware display width (pure bash, no external deps)
-#  Uses python3 if available (accurate east-asian-width),
-#  otherwise a fast UTF-8 byte heuristic (3/4-byte lead -> 2-wide).
+#  A 3/4-byte UTF-8 lead counts as two columns, everything else as one.
+#  No python3 any more: it was ~40ms per measurement and a menu row
+#  measures four strings, so one redraw cost seconds on a small VPS.
 # ============================================================
-# ---- python3 probe (cached once at load: on Windows the store alias is slow/stub) ----
-# Must run outside command substitution, otherwise the cache is lost per subshell.
-_ui_detect_python() {
-    [ -n "${_UI_HAS_PY:-}" ] && return 0
-    if command -v python3 >/dev/null 2>&1 \
-        && [ "$(python3 -c 'print(1)' 2>/dev/null)" = "1" ]; then
-        _UI_HAS_PY=1
-    else
-        _UI_HAS_PY=0
-    fi
-}
-_ui_detect_python
-
-_ui_py_ok() {
-    [ -n "${_UI_HAS_PY:-}" ] || _ui_detect_python
-    [ "$_UI_HAS_PY" = "1" ]
-}
-
 _ui_str_width() {
-    local s="$1"
-    # Prefer python3 for accuracy
-    if _ui_py_ok; then
-        local w
-        w=$(python3 -c "import sys,unicodedata; s=sys.argv[1]; print(sum(2 if unicodedata.east_asian_width(c) in ('W','F') else 1 for c in s))" -- "$s" 2>/dev/null)
-        if [ -n "$w" ] && [ "$w" -ge 0 ] 2>/dev/null; then
-            echo "$w"
-            return
-        fi
+    local s="$1" c
+    [ -z "$s" ] && { printf '0'; return 0; }
+    c="${_UI_W_CACHE[$s]-}"
+    if [ -n "$c" ]; then
+        printf '%s' "$c"
+        return 0
     fi
-
-    # Fallback: count chars and 3/4-byte lead bytes under LC_ALL=C
-    local _lc_saved="${LC_ALL-__PIKA_UNSET__}"
-    LC_ALL=C
-
-    local leads="${s//[$'\x80'-$'\xbf']/}"
-    local chars=${#leads}
-    local wides="${leads//[!$'\xe0'-$'\xf7']/}"
-    local wide=${#wides}
-
-    if [ "$_lc_saved" = "__PIKA_UNSET__" ]; then unset LC_ALL; else LC_ALL="$_lc_saved"; fi
-
-    echo $((chars + wide))
+    _ui_w_into "$s"
+    _UI_W_CACHE["$s"]=$_UI_W
+    printf '%s' "$_UI_W"
 }
 
 # ---- Repeat a single character N times (no external deps) ----
@@ -78,77 +48,85 @@ _ui_repeat_char() {
 
 # ---- Fast display width (pure bash, no subprocess) ----
 # Counts UTF-8 lead bytes as one column and 3/4-byte leads (CJK, emoji) as two.
-_ui_w_fast() {
+# Writes the result to _UI_W instead of printing: a $(...) call would fork a
+# subshell every time, and this runs several times per menu row.
+_ui_w_into() {
     local s="$1" _lc="${LC_ALL-__PIKA_UNSET__}"
     local leads chars wides wide
+    if [ -z "$s" ]; then
+        _UI_W=0
+        return 0
+    fi
     LC_ALL=C
     leads="${s//[$'\x80'-$'\xbf']/}"
     chars=${#leads}
     wides="${leads//[!$'\xe0'-$'\xf7']/}"
     wide=${#wides}
     if [ "$_lc" = "__PIKA_UNSET__" ]; then unset LC_ALL; else LC_ALL="$_lc"; fi
-    printf '%s' $((chars + wide))
+    _UI_W=$((chars + wide))
 }
+
+_ui_w_fast() {
+    _ui_w_into "$1"
+    printf '%s' "$_UI_W"
+}
+
+# 菜单每重绘一次就要量两遍每个标题，量过的字符串直接复用
+declare -gA _UI_W_CACHE=() 2>/dev/null || true
 
 # ---- Pad/truncate a string to exactly N display columns (CJK-aware) ----
 # The result is always N columns wide, so menu rows line up with the divider.
-_ui_str_pad() {
-    local s="${1-}" target="${2-0}" out w cut pad
-    case "$target" in ''|*[!0-9]*) printf '%s' "$s"; return 0 ;; esac
-    [ "$target" -le 0 ] && return 0
-
-    # Prefer python3 for exact east-asian-width; otherwise use the bash heuristic.
-    if _ui_py_ok; then
-        python3 -c '
-import sys, unicodedata
-s = sys.argv[1]; target = int(sys.argv[2])
-def w(t):
-    return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in t)
-if w(s) > target:
-    cut = max(0, target - 3)
-    out, acc = [], 0
-    for c in s:
-        cw = 2 if unicodedata.east_asian_width(c) in ("W", "F") else 1
-        if acc + cw > cut:
-            break
-        out.append(c); acc += cw
-    s = "".join(out) + "..."
-    if w(s) > target:
-        s = "".join(out)
-sys.stdout.write(s + " " * max(0, target - w(s)))
-' -- "$s" "$target" 2>/dev/null && return 0
-        _UI_HAS_PY=0
-    fi
-
-    out="$s"
-    w=$(_ui_w_fast "$out")
-    if [ "$w" -gt "$target" ]; then
-        cut=$((target - 3))
-        [ "$cut" -lt 0 ] && cut=0
-        while [ -n "$out" ] && [ "$(_ui_w_fast "$out")" -gt "$cut" ]; do
-            out="${out%?}"
-        done
-        out="${out}..."
-        w=$(_ui_w_fast "$out")
-        if [ "$w" -gt "$target" ]; then
-            out="${out%???}"
-            w=$(_ui_w_fast "$out")
-        fi
-        printf '%s' "$out"
-        printf '%*s' "$((target - w))" ''
+# Pure bash on purpose: python3 here cost ~40ms per call, i.e. several seconds
+# for one menu redraw on a small VPS.
+# _ui_pad_into writes to _UI_PAD so callers avoid a $(...) fork per cell.
+_ui_pad_into() {
+    local s="${1-}" target="${2-0}" out w cut
+    if [ -z "$target" ] || [ "$target" -le 0 ] 2>/dev/null; then
+        _UI_PAD="$s"
         return 0
     fi
 
-    pad=$((target - w))
-    printf '%s%*s' "$out" "$pad" ''
+    _ui_w_into "$s"
+    w=$_UI_W
+    out="$s"
+    if [ "$w" -gt "$target" ]; then
+        cut=$((target - 3))
+        [ "$cut" -lt 0 ] && cut=0
+        while [ -n "$out" ]; do
+            _ui_w_into "$out"
+            [ "$_UI_W" -le "$cut" ] && break
+            out="${out%?}"
+        done
+        out="${out}..."
+    fi
+
+    _ui_w_into "$out"
+    w=$_UI_W
+    if [ "$w" -ge "$target" ]; then
+        _UI_PAD="$out"
+    else
+        printf -v _UI_PAD '%s%*s' "$out" "$((target - w))" ''
+    fi
+}
+
+_ui_str_pad() {
+    _ui_pad_into "$1" "$2"
+    printf '%s' "$_UI_PAD"
 }
 
 # ---- Terminal width ----
+# 每次重绘都要用，缓存一次；改了 COLUMNS 或窗口大小才需要重算
+_PIKA_TERM_W=""
 _pika_term_width() {
+    if [ -n "$_PIKA_TERM_W" ]; then
+        printf '%s' "$_PIKA_TERM_W"
+        return 0
+    fi
     local w="${COLUMNS:-}"
     [ -z "$w" ] && w=$(tput cols 2>/dev/null || echo 80)
     case "$w" in ''|*[!0-9]*) w=80 ;; esac
-    echo "$w"
+    _PIKA_TERM_W="$w"
+    printf '%s' "$w"
 }
 
 # ---- Clear screen ----
@@ -201,6 +179,16 @@ ui_divider() {
 
 # ---- System info block (compact neofetch-lite) ----
 ui_sysinfo() {
+    # 菜单每次重绘都要画这块，但系统信息不会秒级变化：算一次就缓存。
+    # 传 refresh 强制重算（例如刚装完软件想看新的磁盘占用）。
+    if [ "${1:-}" = "refresh" ]; then
+        _UI_SYSINFO=""
+    fi
+    if [ -n "${_UI_SYSINFO:-}" ]; then
+        printf '%s' "$_UI_SYSINFO"
+        return 0
+    fi
+
     local os="${PIKA_DISTRO:-?} ${PIKA_DISTRO_VER:-}"
     local kern; kern=$(uname -r 2>/dev/null || echo "?")
     local arch; arch=$(uname -m 2>/dev/null || echo "?")
@@ -229,16 +217,19 @@ ui_sysinfo() {
     [ -z "$board" ] && board=$(cat /sys/devices/virtual/dmi/id/sys_vendor /sys/devices/virtual/dmi/id/product_name 2>/dev/null | paste -sd ' ' -)
     [ -z "$board" ] && board="Virtual Machine"
 
-    # Shell + resolution
+    # Shell + resolution（服务器没有 X，别为此拉 xdpyinfo）
     local shell_name; shell_name=$(basename "${SHELL:-sh}" 2>/dev/null)
-    local res=""; res=$(xdpyinfo 2>/dev/null | grep 'dimensions' | awk '{print $2}' | head -1)
+    local res=""
+    if [ -n "${DISPLAY:-}" ]; then
+        res=$(xdpyinfo 2>/dev/null | grep 'dimensions' | awk '{print $2}' | head -1)
+    fi
 
     local container_info=""
     pika_is_container 2>/dev/null && container_info=" (容器环境)"
 
     local C="${PIKA_CYAN}" N="${PIKA_NC}" G="${PIKA_GREEN}" B="${PIKA_BOLD}" Y="${PIKA_YELLOW}"
 
-    printf '%b' \
+    printf -v _UI_SYSINFO '%b' \
 "${C}
   ┌────────────────────────────────────────────────────────┐
   │  ${G}操作系统${C}    ${B}${os}${C}
@@ -253,6 +244,7 @@ ui_sysinfo() {
   │  ${G}磁盘用量${C}   ${disk:-?}${N}
   ${C}└────────────────────────────────────────────────────────┘
 ${N}"
+    printf '%s' "$_UI_SYSINFO"
 }
 
 # ============================================================
@@ -269,8 +261,8 @@ _UI_ROW_W=60
 ui_item() {
     local num="$1" name="$2" desc="${3:-}"
     local name_padded desc_padded
-    name_padded=$(_ui_str_pad "$name" "$_UI_NAME_COL")
-    desc_padded=$(_ui_str_pad "$desc" "$_UI_DESC_COL")
+    _ui_pad_into "$name" "$_UI_NAME_COL"; name_padded="$_UI_PAD"
+    _ui_pad_into "$desc" "$_UI_DESC_COL"; desc_padded="$_UI_PAD"
 
     printf '  %s%*s%s  %s%s%s  %s%s%s\n' \
         "${PIKA_GREEN}" "$_UI_NUM_COL" "[$num]" "${PIKA_NC}" \
@@ -294,13 +286,13 @@ ui_menu_size() {
     local entry key title_key desc_key handler nw dw name_col=12 desc_col=38
     for entry in "${_ui_entries[@]}"; do
         IFS='|' read -r key title_key desc_key handler <<< "$entry"
-        nw=$(_ui_str_width "$(t "$title_key")")
-        dw=$(_ui_str_width "$(t "$desc_key")")
+        t_into "$title_key"; _ui_w_into "$_T"; nw=$_UI_W
+        t_into "$desc_key";  _ui_w_into "$_T"; dw=$_UI_W
         [ "$nw" -gt "$name_col" ] && name_col=$nw
         [ "$dw" -gt "$desc_col" ] && desc_col=$dw
     done
     if [ -n "$back_label" ]; then
-        nw=$(_ui_str_width "$back_label")
+        _ui_w_into "$back_label"; nw=$_UI_W
         [ "$nw" -gt "$name_col" ] && name_col=$nw
     fi
 
@@ -329,10 +321,12 @@ ui_menu() {
 
     ui_divider "$((row_w - 2))"
     ui_section "$title"
-    local idx=1 entry key title_key desc_key handler
+    local idx=1 entry key title_key desc_key handler t_name t_desc
     for entry in "${entries[@]}"; do
         IFS='|' read -r key title_key desc_key handler <<< "$entry"
-        ui_item "$idx" "$(t "$title_key")" "$(t "$desc_key")"
+        t_into "$title_key"; t_name="$_T"
+        t_into "$desc_key";  t_desc="$_T"
+        ui_item "$idx" "$t_name" "$t_desc"
         idx=$((idx + 1))
     done
 
@@ -340,7 +334,8 @@ ui_menu() {
 
     printf '\n'
     ui_divider "$((row_w - 2))"
-    printf '  %s ' "$(t 'menu.prompt')"
+    t_into 'menu.prompt'
+    printf '  %s ' "$_T"
 }
 
 # ============================================================
